@@ -1,0 +1,19 @@
+# Secrets — never commit these
+.env
+.env.local
+.env*.local
+
+# Local database file
+store.db
+store.db-*
+
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# OS files
+.DS_Store
+Thumbs.db
