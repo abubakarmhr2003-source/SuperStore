@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../utils/api";
-const CATS = ["Biscuits & Snacks","Beverages","Dairy","Dry Fruits","Atta & Rice","Household","Personal Care","Medicines","Other"];
+const CATS = ["Biscuits & Snacks","Beverages","Dairy","Dry Fruits","Atta & Rice","Kiryana","Manyari","Stationery","Household","Personal Care","Medicines","Other"];
 
 export default function Stock() {
   const [items, setItems] = useState([]);
