@@ -19,6 +19,8 @@ export default function Billing() {
   const [customer, setCustomer] = useState("");
   const [phone, setPhone] = useState("");
   const [selItem, setSelItem] = useState("");
+  const [search, setSearch] = useState("");
+  const [showList, setShowList] = useState(false);
   const [qty, setQty] = useState(1);
   const [msg, setMsg] = useState("");
   const [billNo, setBillNo] = useState(genBillNo());
@@ -44,8 +46,12 @@ export default function Billing() {
     if(already+qty>item.qty) return notify(`❌ Only ${item.qty-already} piece(s) available`);
     if(existing) setBillItems(billItems.map(b=>b.id===item.id?{...b,qty:b.qty+qty}:b));
     else setBillItems([...billItems,{id:item.id,name:item.name,sale_price:item.sale_price,cost_price:item.cost_price,qty,discount:0}]);
-    setSelItem(""); setQty(1);
+    setSelItem(""); setSearch(""); setShowList(false); setQty(1);
   };
+
+  const q = search.trim().toLowerCase();
+  const matches = items.filter(i => !q || i.name.toLowerCase().includes(q));
+  const pickItem = i => { setSelItem(String(i.id)); setSearch(i.name); setShowList(false); setQty(1); };
 
   const setDiscount = (id, value) => {
     setBillItems(billItems.map(b=>{
@@ -89,10 +95,34 @@ export default function Billing() {
             <div><label>Phone No.</label><input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="Optional" /></div>
           </div>
           <label>Select Item</label>
-          <select value={selItem} onChange={e=>{setSelItem(e.target.value);setQty(1);}}>
-            <option value="">-- Choose an item --</option>
-            {items.map(i=><option key={i.id} value={i.id}>{i.name} ({i.qty} in stock) — Rs.{i.sale_price}</option>)}
-          </select>
+          <div className="item-search">
+            <input
+              value={search}
+              placeholder="🔍 Type to search item..."
+              autoComplete="off"
+              onChange={e=>{setSearch(e.target.value); setSelItem(""); setShowList(true);}}
+              onFocus={()=>setShowList(true)}
+              onBlur={()=>setShowList(false)}
+              onKeyDown={e=>{
+                if(e.key==="Enter"){ e.preventDefault(); if(showList && matches.length) pickItem(matches[0]); else addToBill(); }
+                if(e.key==="Escape") setShowList(false);
+              }}
+            />
+            {selItem && <button type="button" className="item-search-clear" onMouseDown={e=>{e.preventDefault(); setSelItem(""); setSearch(""); setShowList(true);}}>×</button>}
+            {showList && (
+              <div className="item-search-list">
+                {matches.length===0
+                  ? <div className="item-search-empty">No item found</div>
+                  : matches.map(i=>(
+                    <div key={i.id} className={"item-search-opt"+(String(i.id)===selItem?" active":"")}
+                      onMouseDown={e=>{e.preventDefault(); pickItem(i);}}>
+                      <span>{i.name}</span>
+                      <small>{i.qty} in stock · Rs.{i.sale_price}</small>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
           <label>Quantity</label>
           <input type="number" min="1" value={qty} onChange={e=>setQty(Math.max(1,+e.target.value))} />
           <button className="btn-primary full-width" onClick={addToBill}>+ Add to Bill</button>
