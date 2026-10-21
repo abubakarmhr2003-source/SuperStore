@@ -14,6 +14,7 @@ function openBill(s) {
 export default function History() {
   const [sales, setSales] = useState([]);
   const [filter, setFilter] = useState("all");
+  const [search, setSearch] = useState("");
   const [msg, setMsg] = useState("");
   const load = () => api.getSales().then(setSales);
   useEffect(() => { load(); }, []);
@@ -24,10 +25,20 @@ export default function History() {
   };
   const today = new Date().toDateString();
   const thisMonth = new Date().toISOString().slice(0,7);
+  const q = search.trim().toLowerCase();
+  const matchesSearch = s => {
+    if(!q) return true;
+    const hay = [
+      s.customer, s.sold_by, `#${s.id}`, String(s.id),
+      new Date(s.sale_date).toLocaleString(), s.sale_date,
+      ...(s.items_json||[]).map(i=>i.name),
+    ].filter(Boolean).join(" ").toLowerCase();
+    return hay.includes(q);
+  };
   const filtered = sales.filter(s => {
-    if(filter==="today") return new Date(s.sale_date).toDateString()===today;
-    if(filter==="month") return s.sale_date.startsWith(thisMonth);
-    return true;
+    if(filter==="today" && new Date(s.sale_date).toDateString()!==today) return false;
+    if(filter==="month" && !s.sale_date.startsWith(thisMonth)) return false;
+    return matchesSearch(s);
   });
   const totalRev = filtered.reduce((a,s)=>a+s.total,0);
   const totalPro = filtered.reduce((a,s)=>a+s.profit,0);
@@ -41,6 +52,12 @@ export default function History() {
         <div className="metric-card metric-green"><span className="metric-icon">💰</span><div className="metric-label">Profit</div><div className="metric-value">Rs. {totalPro.toLocaleString()}</div></div>
       </div>
       <div className="card">
+        <input
+          value={search}
+          onChange={e=>setSearch(e.target.value)}
+          placeholder="🔍 Search by customer, item, bill no. or date..."
+          style={{marginBottom:"12px"}}
+        />
         <div className="filter-row">
           {["all","today","month"].map(f=><button key={f} className={filter===f?"btn-filter active":"btn-filter"} onClick={()=>setFilter(f)}>{f==="all"?"All Time":f==="today"?"Today":"This Month"}</button>)}
         </div>
