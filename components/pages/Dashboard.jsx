@@ -12,9 +12,14 @@ export default function Dashboard() {
   useEffect(() => {
     mounted.current = true;
     setLoading(true); setError(null);
-    Promise.all([api.getStats(), api.getItems(), api.getSales()])
-      .then(([s, i, sa]) => { if (!mounted.current) return; setStats(s); setItems(i); setSales(sa); })
-      .catch(e => { if (mounted.current) setError(e.message); })
+    Promise.allSettled([api.getStats(), api.getItems(), api.getSales()])
+      .then(res => {
+        if (!mounted.current) return;
+        const names = ["stats", "items", "sales"];
+        const failed = res.map((r, k) => r.status === "rejected" ? `${names[k]}: ${r.reason?.message}` : null).filter(Boolean);
+        if (failed.length) return setError(failed.join(" | "));
+        setStats(res[0].value); setItems(res[1].value); setSales(res[2].value);
+      })
       .finally(() => { if (mounted.current) setLoading(false); });
     return () => { mounted.current = false; };
   }, []);
