@@ -1,108 +1,58 @@
 import { NextResponse } from "next/server";
-import { row, query } from "@/lib/db";
+import { rows, row, query } from "@/lib/db";
 import { verifyToken, withErrorHandling, ApiError } from "@/lib/auth";
 import { ensureSchema } from "@/lib/initDb";
 
-export async function DELETE(req, { params }) {
+export async function GET(req) {
   return withErrorHandling(async () => {
     await ensureSchema();
     const user = await verifyToken(req);
-    const saleId = parseInt(params.id, 10);
-    const sale = await row("SELECT * FROM sales WHERE id=$1 AND shop_id=$2", [saleId, user.shop_id]);
-    if (!sale) throw new ApiError(404, "Sale not found");
-
-    const items = JSON.parse(sale.items_json);
-    for (const i of items) {
-      await query(
-        "UPDATE items SET qty=qty+$1,sold=sold-$2 WHERE id=$3 AND shop_id=$4",
-        [i.qty, i.qty, i.id, user.shop_id]
-      );
-    }
-    await query("DELETE FROM sales WHERE id=$1 AND shop_id=$2", [saleId, user.shop_id]);
-    return NextResponse.json({ ok: true });
+    const list = await rows("SELECT * FROM sales WHERE shop_id=$1 ORDER BY sale_date DESC", [user.shop_id]);
+    const result = list.map((r) => ({ ...r, items_json: JSON.parse(r.items_json) }));
+    return NextResponse.json(result);
   });
 }
 
-// Edit an existing sale: customer name + item lines (qty / discount / remove / add).
-// Stock is adjusted by the difference between the old and the new quantities.
-export async function PUT(req, { params }) {
+export async function POST(req) {
   return withErrorHandling(async () => {
     await ensureSchema();
     const user = await verifyToken(req);
-    const saleId = parseInt(params.id, 10);
-    const sale = await row("SELECT * FROM sales WHERE id=$1 AND shop_id=$2", [saleId, user.shop_id]);
-    if (!sale) throw new ApiError(404, "Sale not found");
-
     const data = await req.json();
-    const customer = (data.customer || "").trim() || "Walk-in Customer";
-    const incoming = Array.isArray(data.items) ? data.items : [];
-    if (!incoming.length) throw new ApiError(400, "A sale needs at least one item (delete the sale instead)");
+    const customer = data.customer || "Walk-in Customer";
+    const items = data.items || [];
 
-    const oldItems = JSON.parse(sale.items_json);
-    const oldById = new Map(oldItems.map((i) => [i.id, i]));
+    const saleItems = [];
+    let total = 0;
+    let profit = 0;
 
-    // Build the new item list. Existing lines keep their original prices
-    // (history stays accurate); newly added lines use the current item price.
-    const newItems = [];
-    const seen = new Set();
-    for (const bi of incoming) {
-      const id = +bi.id;
-      const qty = Math.floor(+bi.qty);
-      if (!id || !(qty >= 1)) throw new ApiError(400, "Every item needs a quantity of at least 1");
-      if (seen.has(id)) throw new ApiError(400, "Same item added twice");
-      seen.add(id);
+    for (const bi of items) {
+      const item = await row("SELECT * FROM items WHERE id=$1 AND shop_id=$2", [bi.item_id, user.shop_id]);
+      if (!item) throw new ApiError(400, `Item ${bi.item_id} not found`);
+      if (item.qty < bi.qty) throw new ApiError(400, `Not enough stock for ${item.name}`);
 
-      let name, sale_price, cost_price;
-      const old = oldById.get(id);
-      if (old) {
-        ({ name, sale_price, cost_price } = old);
-      } else {
-        const item = await row("SELECT * FROM items WHERE id=$1 AND shop_id=$2", [id, user.shop_id]);
-        if (!item) throw new ApiError(400, `Item ${id} not found`);
-        ({ name, sale_price, cost_price } = item);
-      }
-      const gross = sale_price * qty;
-      const discount = Math.max(0, Math.min(+bi.discount || 0, gross));
-      newItems.push({
-        id, name, qty, sale_price, cost_price, discount,
-        line_total: gross - discount,
+      const gross = item.sale_price * bi.qty;
+      const disc = Math.max(0, Math.min(bi.discount || 0, gross));
+      const lt = gross - disc;
+      const lp = lt - item.cost_price * bi.qty;
+      total += lt;
+      profit += lp;
+
+      saleItems.push({
+        id: item.id, name: item.name, qty: bi.qty,
+        sale_price: item.sale_price, cost_price: item.cost_price,
+        discount: disc, line_total: lt,
       });
-    }
 
-    // Work out the stock change per item (positive = more units leave stock).
-    const delta = new Map();
-    for (const o of oldItems) delta.set(o.id, -o.qty);
-    for (const n of newItems) delta.set(n.id, (delta.get(n.id) || 0) + n.qty);
-
-    // Validate all stock first so nothing is half-applied.
-    for (const [id, d] of delta) {
-      if (d <= 0) continue;
-      const item = await row("SELECT name, qty FROM items WHERE id=$1 AND shop_id=$2", [id, user.shop_id]);
-      if (!item) throw new ApiError(400, `Item ${id} not found`);
-      if (item.qty < d) throw new ApiError(400, `Not enough stock for ${item.name} (only ${item.qty} more available)`);
-    }
-    for (const [id, d] of delta) {
-      if (d === 0) continue;
       await query(
-        "UPDATE items SET qty=qty-$1, sold=sold+$1 WHERE id=$2 AND shop_id=$3",
-        [d, id, user.shop_id]
+        "UPDATE items SET qty=qty-$1,sold=sold+$2 WHERE id=$3 AND shop_id=$4",
+        [bi.qty, bi.qty, bi.item_id, user.shop_id]
       );
     }
 
-    const total = newItems.reduce((a, i) => a + i.line_total, 0);
-    const profit = newItems.reduce((a, i) => a + i.line_total - i.cost_price * i.qty, 0);
-
-    const updated = await row(
-      "UPDATE sales SET customer=$1, items_json=$2, total=$3, profit=$4 WHERE id=$5 AND shop_id=$6 RETURNING *",
-      [customer, JSON.stringify(newItems), total, profit, saleId, user.shop_id]
+    const sale = await row(
+      "INSERT INTO sales (shop_id,customer,items_json,total,profit,sold_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *",
+      [user.shop_id, customer, JSON.stringify(saleItems), total, profit, user.username]
     );
-
-    // If this was a credit (udhaar) sale, keep the credit book in sync.
-    await query(
-      "UPDATE credit_ledger SET amount=$1 WHERE sale_id=$2 AND type='debit' AND shop_id=$3",
-      [total, saleId, user.shop_id]
-    );
-
-    return NextResponse.json({ ...updated, items_json: JSON.parse(updated.items_json) });
+    return NextResponse.json({ ...sale, items_json: JSON.parse(sale.items_json) });
   });
 }
