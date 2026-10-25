@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { api } from "../utils/api";
 
+const fmt = v => Number(v ?? 0).toLocaleString();
+
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [items, setItems] = useState([]);
@@ -18,7 +20,11 @@ export default function Dashboard() {
         const names = ["stats", "items", "sales"];
         const failed = res.map((r, k) => r.status === "rejected" ? `${names[k]}: ${r.reason?.message}` : null).filter(Boolean);
         if (failed.length) return setError(failed.join(" | "));
-        setStats(res[0].value); setItems(res[1].value); setSales(res[2].value);
+        const st = res[0].value;
+        if (!st || typeof st !== "object" || st.total_revenue === undefined || st.today_revenue === undefined) {
+          return setError("stats returned unexpected data: " + JSON.stringify(st).slice(0, 250));
+        }
+        setStats(st); setItems(res[1].value); setSales(res[2].value);
       })
       .finally(() => { if (mounted.current) setLoading(false); });
     return () => { mounted.current = false; };
@@ -50,11 +56,11 @@ export default function Dashboard() {
       </div>
 
       <div className="metrics-grid">
-        <Metric label="Today's Sales"   value={`Rs. ${stats.today_revenue.toLocaleString()}`}  color="blue"   icon="📈" />
-        <Metric label="Today's Profit"  value={`Rs. ${stats.today_profit.toLocaleString()}`}   color="green"  icon="💰" />
-        <Metric label="Total Revenue"   value={`Rs. ${stats.total_revenue.toLocaleString()}`}  color="purple" icon="🏦" />
-        <Metric label="Net Profit"      value={`Rs. ${stats.net_profit.toLocaleString()}`}     color={stats.net_profit >= 0 ? "teal" : "red"} icon="📊" />
-        <Metric label="Stock Value"     value={`Rs. ${stats.stock_value.toLocaleString()}`}    color="amber"  icon="📦" />
+        <Metric label="Today's Sales"   value={`Rs. ${fmt(stats.today_revenue)}`}  color="blue"   icon="📈" />
+        <Metric label="Today's Profit"  value={`Rs. ${fmt(stats.today_profit)}`}   color="green"  icon="💰" />
+        <Metric label="Total Revenue"   value={`Rs. ${fmt(stats.total_revenue)}`}  color="purple" icon="🏦" />
+        <Metric label="Net Profit"      value={`Rs. ${fmt(stats.net_profit)}`}     color={stats.net_profit >= 0 ? "teal" : "red"} icon="📊" />
+        <Metric label="Stock Value"     value={`Rs. ${fmt(stats.stock_value)}`}    color="amber"  icon="📦" />
         <Metric label="Total Sales"     value={stats.total_sales_count}                        color="blue"   icon="🧾" />
         <Metric label="Low Stock Items" value={stats.low_stock}                                color="orange" icon="⚠️" />
         <Metric label="Out of Stock"    value={stats.out_of_stock}                             color="red"    icon="❌" />
@@ -71,8 +77,8 @@ export default function Dashboard() {
                   <tr key={s.id}>
                     <td className="bold">{s.customer}</td>
                     <td className="muted">{s.items_json.map(i => i.name).join(", ")}</td>
-                    <td className="bold">Rs. {s.total.toFixed(0)}</td>
-                    <td className="green">Rs. {s.profit.toFixed(0)}</td>
+                    <td className="bold">Rs. {Number(s.total||0).toFixed(0)}</td>
+                    <td className="green">Rs. {Number(s.profit||0).toFixed(0)}</td>
                   </tr>
                 ))}
               </tbody>
