@@ -39,6 +39,7 @@ export const api = {
 
   getSales:       ()     => req("/sales"),
   createSale:     (data) => req("/sales", "POST", data),
+  updateSale:     (id, data) => req(`/sales/${id}`, "PUT", data),
   deleteSale:     (id)   => req(`/sales/${id}`, "DELETE"),
 
   getExpenses:    ()     => req("/expenses"),
