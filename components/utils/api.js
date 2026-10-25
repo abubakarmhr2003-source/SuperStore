@@ -18,7 +18,7 @@ async function req(path, method = "GET", body) {
     throw new Error("Session expired. Please login again.");
   }
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ detail: "Server error" }));
+    const err = await res.json().catch(() => ({ detail: `Server error (HTTP ${res.status})` }));
     throw new Error(err.detail || "Request failed");
   }
   return res.json();
