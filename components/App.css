@@ -1026,3 +1026,14 @@ button { cursor: pointer; font-family: inherit; transition: all 0.2s cubic-bezie
 .item-search-opt small { color: var(--text2); font-size: 11px; white-space: nowrap; }
 .item-search-opt:hover, .item-search-opt.active { background: var(--surface2); }
 .item-search-empty { padding: 12px; font-size: 13px; color: var(--muted); text-align: center; }
+
+/* ── Edit sale modal (History) ── */
+.edit-overlay {
+  position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.65);
+  display: flex; align-items: center; justify-content: center; padding: 12px;
+}
+.edit-modal {
+  width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto;
+  background: #1a1a2e; border: 1px solid var(--border2);
+  border-radius: 14px; padding: 18px; box-shadow: var(--shadow);
+}
