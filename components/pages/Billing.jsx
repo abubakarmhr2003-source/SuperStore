@@ -21,7 +21,7 @@ export default function Billing() {
   const [selItem, setSelItem] = useState("");
   const [search, setSearch] = useState("");
   const [showList, setShowList] = useState(false);
-  const [qty, setQty] = useState(1);
+  const [qty, setQty] = useState("");
   const [msg, setMsg] = useState("");
   const [billNo, setBillNo] = useState(genBillNo());
   const [loading, setLoading] = useState(false);
@@ -41,17 +41,19 @@ export default function Billing() {
     if(!selItem) return notify("❌ Please select an item");
     const item = items.find(i=>i.id===+selItem);
     if(!item) return;
+    const n = Math.floor(+qty);
+    if(!(n>=1)) return notify("❌ Please enter quantity");
     const existing = billItems.find(b=>b.id===item.id);
     const already = existing?existing.qty:0;
-    if(already+qty>item.qty) return notify(`❌ Only ${item.qty-already} piece(s) available`);
-    if(existing) setBillItems(billItems.map(b=>b.id===item.id?{...b,qty:b.qty+qty}:b));
-    else setBillItems([...billItems,{id:item.id,name:item.name,sale_price:item.sale_price,cost_price:item.cost_price,qty,discount:0}]);
-    setSelItem(""); setSearch(""); setShowList(false); setQty(1);
+    if(already+n>item.qty) return notify(`❌ Only ${item.qty-already} piece(s) available`);
+    if(existing) setBillItems(billItems.map(b=>b.id===item.id?{...b,qty:b.qty+n}:b));
+    else setBillItems([...billItems,{id:item.id,name:item.name,sale_price:item.sale_price,cost_price:item.cost_price,qty:n,discount:0}]);
+    setSelItem(""); setSearch(""); setShowList(false); setQty("");
   };
 
   const q = search.trim().toLowerCase();
   const matches = items.filter(i => !q || i.name.toLowerCase().includes(q));
-  const pickItem = i => { setSelItem(String(i.id)); setSearch(i.name); setShowList(false); setQty(1); };
+  const pickItem = i => { setSelItem(String(i.id)); setSearch(i.name); setShowList(false); };
 
   const setDiscount = (id, value) => {
     setBillItems(billItems.map(b=>{
@@ -124,7 +126,10 @@ export default function Billing() {
             )}
           </div>
           <label>Quantity</label>
-          <input type="number" min="1" value={qty} onChange={e=>setQty(Math.max(1,+e.target.value))} />
+          <input type="number" min="1" value={qty} placeholder="0"
+            onChange={e=>setQty(e.target.value)}
+            onFocus={e=>e.target.select()}
+            onKeyDown={e=>{ if(e.key==="Enter"){ e.preventDefault(); addToBill(); } }} />
           <button className="btn-primary full-width" onClick={addToBill}>+ Add to Bill</button>
 
           {billItems.length>0&&<>
@@ -137,7 +142,17 @@ export default function Billing() {
                   <span className="bill-name">{b.name}</span>
                   <div className="bill-qty-ctrl">
                     <button className="qty-btn" onClick={()=>{if(b.qty>1){const newQty=b.qty-1;const newGross=newQty*b.sale_price;setBillItems(billItems.map(x=>x.id===b.id?{...x,qty:newQty,discount:Math.min(x.discount||0,newGross)}:x));}}}>−</button>
-                    <span style={{minWidth:"22px",textAlign:"center",fontWeight:700}}>{b.qty}</span>
+                    <input type="number" min="1" value={b.qty}
+                      onFocus={e=>e.target.select()}
+                      onChange={e=>{
+                        const item=items.find(i=>i.id===b.id);
+                        let n=Math.floor(+e.target.value)||1;
+                        if(n<1) n=1;
+                        if(item && n>item.qty){ n=item.qty; notify(`❌ Only ${item.qty} piece(s) available`); }
+                        const g=n*b.sale_price;
+                        setBillItems(billItems.map(x=>x.id===b.id?{...x,qty:n,discount:Math.min(x.discount||0,g)}:x));
+                      }}
+                      style={{width:"58px",textAlign:"center",fontWeight:700,padding:"4px 6px",fontSize:"13px",marginBottom:0}} />
                     <button className="qty-btn" onClick={()=>{const item=items.find(i=>i.id===b.id);if(!item||b.qty<item.qty)setBillItems(billItems.map(x=>x.id===b.id?{...x,qty:x.qty+1}:x));}}>+</button>
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:"4px",flexShrink:0}}>
