@@ -527,7 +527,7 @@ export default function Reports() {
             { label: "Stock Value",      value: money(stats?.stock_value),    color: "var(--amber)"  },
             { label: "Credit Due",       value: money(outstandingCredit),     color: "var(--orange)" },
           ].map(s => (
-            <div key={s.label} style={{ background: "rgba(255,255,255,0.04)", borderRadius: "var(--radius)", padding: "12px", border: "1px solid var(--border)" }}>
+            <div key={s.label} style={{ background: "rgb(var(--ov) / 0.04)", borderRadius: "var(--radius)", padding: "12px", border: "1px solid var(--border)" }}>
               <div style={{ fontSize: "11px", color: "var(--muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" }}>{s.label}</div>
               <div style={{ fontSize: "17px", fontWeight: 800, color: s.color }}>{s.value}</div>
             </div>
