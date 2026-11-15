@@ -20,6 +20,7 @@ export async function POST(req) {
     const data = await req.json();
     const customer = data.customer || "Walk-in Customer";
     const items = data.items || [];
+    const prevBalance = Math.max(0, Number(data.prev_balance) || 0);
 
     const saleItems = [];
     let total = 0;
@@ -50,8 +51,8 @@ export async function POST(req) {
     }
 
     const sale = await row(
-      "INSERT INTO sales (shop_id,customer,items_json,total,profit,sold_by) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *",
-      [user.shop_id, customer, JSON.stringify(saleItems), total, profit, user.username]
+      "INSERT INTO sales (shop_id,customer,items_json,total,profit,sold_by,prev_balance) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *",
+      [user.shop_id, customer, JSON.stringify(saleItems), total, profit, user.username, prevBalance]
     );
     return NextResponse.json({ ...sale, items_json: JSON.parse(sale.items_json) });
   });

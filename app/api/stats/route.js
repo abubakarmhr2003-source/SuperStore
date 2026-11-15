@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { row } from "@/lib/db";
+import { row, rows } from "@/lib/db";
+import { pkDay, lastPkDays, utcCutoff } from "@/lib/pkTime";
 import { verifyToken, withErrorHandling } from "@/lib/auth";
 import { ensureSchema } from "@/lib/initDb";
 
@@ -8,7 +9,9 @@ export async function GET(req) {
     await ensureSchema();
     const user = await verifyToken(req);
     const sid = user.shop_id;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = pkDay();                // Pakistan date, not UTC
+    const days = lastPkDays(7);
+    const cutoff = utcCutoff(9);
 
     // One round-trip to the database instead of a dozen.
     const r = await row(
@@ -21,10 +24,21 @@ export async function GET(req) {
         (SELECT COALESCE(SUM(qty*cost_price),0)::float8 FROM items   WHERE shop_id=$1) AS stock_value,
         (SELECT COUNT(*)::int FROM items WHERE shop_id=$1 AND qty<10 AND qty>0) AS low_stock,
         (SELECT COUNT(*)::int FROM items WHERE shop_id=$1 AND qty=0)            AS out_of_stock,
-        (SELECT COALESCE(SUM(total),0)::float8  FROM sales WHERE shop_id=$1 AND sale_date LIKE $2) AS today_revenue,
-        (SELECT COALESCE(SUM(profit),0)::float8 FROM sales WHERE shop_id=$1 AND sale_date LIKE $2) AS today_profit`,
-      [sid, `${today}%`]
+        (SELECT COALESCE(SUM(CASE WHEN type='debit' THEN amount ELSE -amount END),0)::float8 FROM credit_ledger WHERE shop_id=$1) AS total_credit`,
+      [sid]
     );
+
+    // Recent sales / credit entries, grouped by Pakistan calendar day.
+    const recentSales = await rows("SELECT sale_date, total, profit FROM sales WHERE shop_id=$1 AND sale_date >= $2", [sid, cutoff]);
+    const recentCredit = await rows("SELECT entry_date, amount FROM credit_ledger WHERE shop_id=$1 AND type='debit' AND entry_date >= $2", [sid, cutoff]);
+    const byDay = Object.fromEntries(days.map(d => [d, { day: d, revenue: 0, profit: 0 }]));
+    for (const s of recentSales) {
+      const b = byDay[pkDay(s.sale_date)];
+      if (b) { b.revenue += Number(s.total) || 0; b.profit += Number(s.profit) || 0; }
+    }
+    const todayCredit = recentCredit
+      .filter(e => pkDay(e.entry_date) === today)
+      .reduce((a, e) => a + (Number(e.amount) || 0), 0);
 
     return NextResponse.json({
       total_revenue: r.revenue,
@@ -36,8 +50,11 @@ export async function GET(req) {
       stock_value: r.stock_value,
       low_stock: r.low_stock,
       out_of_stock: r.out_of_stock,
-      today_revenue: r.today_revenue,
-      today_profit: r.today_profit,
+      today_revenue: byDay[today]?.revenue ?? 0,
+      today_profit: byDay[today]?.profit ?? 0,
+      today_credit: todayCredit,
+      week: days.map(d => byDay[d]),
+      total_credit: r.total_credit,
     });
   });
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, returnsApi } from "../utils/api";
+import { pkDay } from "../../lib/pkTime";
 import { getShopInfo } from "../utils/shopInfo";
 
 export default function Returns() {
@@ -70,11 +71,11 @@ export default function Returns() {
     load();
   };
 
-  const today = new Date().toDateString();
-  const thisMonth = new Date().toISOString().slice(0, 7);
+  const today = pkDay();
+  const thisMonth = pkDay().slice(0, 7);
   const filtered = returns.filter(r => {
-    if (filter === "today") return new Date(r.return_date).toDateString() === today;
-    if (filter === "month") return r.return_date.startsWith(thisMonth);
+    if (filter === "today") return pkDay(r.return_date) === today;
+    if (filter === "month") return pkDay(r.return_date).startsWith(thisMonth);
     return true;
   });
 

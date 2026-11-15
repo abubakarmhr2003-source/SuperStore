@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../utils/api";
 import { getShopInfo } from "../utils/shopInfo";
 import { showBill } from "../utils/printDoc";
+import { pkDay } from "../../lib/pkTime";
 function openBill(s) {
   showBill({
     shop: getShopInfo(),
@@ -9,8 +10,31 @@ function openBill(s) {
     date: s.sale_date,
     customer: s.customer,
     items: s.items_json,
+    prevBalance: s.prev_balance || 0,
   });
 }
+const MONTHS = ["january","february","march","april","may","june","july","august","september","october","november","december"];
+const parseSaleDate = v => {
+  let d = new Date(v);
+  if (isNaN(d)) d = new Date(String(v||"").replace(" ", "T").replace(/([+-]\d\d)$/, "$1:00"));
+  return isNaN(d) ? null : d;
+};
+// Every common way a person might type a date, all with "/" as separator.
+const dateKeys = v => {
+  const d = parseSaleDate(v);
+  if (!d) return String(v||"").slice(0,10).replace(/-/g,"/").toLowerCase();
+  const D = d.getDate(), M = d.getMonth()+1, Y = d.getFullYear();
+  const dd = String(D).padStart(2,"0"), mm = String(M).padStart(2,"0"), yy = String(Y).slice(2);
+  const mon = MONTHS[M-1], m3 = mon.slice(0,3);
+  return [
+    `${dd}/${mm}/${Y}`, `${D}/${M}/${Y}`, `${dd}/${mm}/${yy}`, `${dd}/${mm}`, `${D}/${M}`,
+    `${Y}/${mm}/${dd}`, `${Y}/${mm}`, `${mm}/${Y}`, `${M}/${Y}`,
+    `${dd}/${mon}/${Y}`, `${D}/${mon}/${Y}`, `${dd}/${m3}/${Y}`, `${D}/${m3}/${Y}`,
+    `${dd}/${mon}`, `${D}/${mon}`, `${dd}/${m3}`, `${D}/${m3}`,
+    `${mon}/${D}`, `${m3}/${D}`, `${mon}/${Y}`, `${m3}/${Y}`, mon, m3, String(Y),
+  ].join(" | ");
+};
+
 export default function History() {
   const [sales, setSales] = useState([]);
   const [filter, setFilter] = useState("all");
@@ -65,8 +89,8 @@ export default function History() {
   const addQ = addSearch.trim().toLowerCase();
   const addMatches = addQ ? allItems.filter(i => i.name.toLowerCase().includes(addQ) && i.qty>0 && !eItems.some(x=>x.id===i.id)).slice(0,6) : [];
 
-  const today = new Date().toDateString();
-  const thisMonth = new Date().toISOString().slice(0,7);
+  const today = pkDay();
+  const thisMonth = pkDay().slice(0,7);
   const q = search.trim().toLowerCase();
   const matchesSearch = s => {
     if(!q) return true;
@@ -75,11 +99,14 @@ export default function History() {
       new Date(s.sale_date).toLocaleString(), s.sale_date,
       ...(s.items_json||[]).map(i=>i.name),
     ].filter(Boolean).join(" ").toLowerCase();
-    return hay.includes(q);
+    if (hay.includes(q)) return true;
+    // date search: 15/11/2026, 15-11-2026, 2026-11-15, 15 nov, november ...
+    const qd = q.replace(/[\s.,\/-]+/g, "/").replace(/^\/|\/$/g, "");
+    return qd.length>=3 && dateKeys(s.sale_date).includes(qd);
   };
   const filtered = sales.filter(s => {
-    if(filter==="today" && new Date(s.sale_date).toDateString()!==today) return false;
-    if(filter==="month" && !s.sale_date.startsWith(thisMonth)) return false;
+    if(filter==="today" && pkDay(s.sale_date)!==today) return false;
+    if(filter==="month" && !pkDay(s.sale_date).startsWith(thisMonth)) return false;
     return matchesSearch(s);
   });
   const totalRev = filtered.reduce((a,s)=>a+s.total,0);

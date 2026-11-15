@@ -1,12 +1,13 @@
 import { useEffect, useState, useRef } from "react";
 import { api, creditApi } from "../utils/api";
 import { getShopInfo } from "../utils/shopInfo";
+import { pkDay } from "../../lib/pkTime";
 import * as XLSX from "xlsx";
 
 /* ── helpers ─────────────────────────────── */
 const fmt   = (n) => Number(n || 0).toFixed(2);
 const money = (n) => `Rs. ${Number(n || 0).toLocaleString("en-PK", { minimumFractionDigits: 0 })}`;
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => pkDay();
 
 function autoWidth(ws) {
   const range = XLSX.utils.decode_range(ws["!ref"] || "A1");
@@ -80,7 +81,7 @@ export default function Reports() {
 
   /* filter sales by date range */
   const filteredSales = sales.filter(s => {
-    const d = s.sale_date?.slice(0, 10);
+    const d = pkDay(s.sale_date);
     if (dateFrom && d < dateFrom) return false;
     if (dateTo   && d > dateTo)   return false;
     return true;
@@ -185,7 +186,7 @@ export default function Reports() {
       /* Daily summary */
       const dayMap = {};
       filteredSales.forEach(s => {
-        const day = s.sale_date?.slice(0,10);
+        const day = pkDay(s.sale_date);
         if (!dayMap[day]) dayMap[day] = { txns:0, revenue:0, profit:0 };
         dayMap[day].txns++;
         dayMap[day].revenue += s.total;

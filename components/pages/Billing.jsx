@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { api, creditApi } from "../utils/api";
 import { getShopInfo } from "../utils/shopInfo";
-import { showBill } from "../utils/printDoc";
+import { showBill, billRate } from "../utils/printDoc";
 
 // Opens the bill in an in-page overlay (works on mobile — no popup needed).
-function openBill({ billItems, customer, phone, billNo, saleDate }) {
-  showBill({ shop: getShopInfo(), billNo, date: saleDate, customer, phone, items: billItems });
+function openBill({ billItems, customer, phone, billNo, saleDate, prevBalance }) {
+  showBill({ shop: getShopInfo(), billNo, date: saleDate, customer, phone, items: billItems, prevBalance });
 }
 
 function genBillNo() {
@@ -66,7 +66,12 @@ export default function Billing() {
 
   const subtotal      = billItems.reduce((a,b)=>a+b.sale_price*b.qty,0);
   const totalDiscount = billItems.reduce((a,b)=>a+(b.discount||0),0);
-  const total  = subtotal - totalDiscount;
+  const total  = subtotal - totalDiscount;           // this bill only (goes to sales / credit book)
+  const udhaarCust  = isUdhaar ? creditCustomers.find(c=>c.id===+udhaarCustId) : null;
+  const prevBalance = udhaarCust && udhaarCust.balance>0 ? udhaarCust.balance : 0;   // customer's old unpaid balance
+  const grandTotal  = total + prevBalance;
+  const billCustomer = customer.trim() || udhaarCust?.name || "Walk-in Customer";
+  const billPhone    = phone.trim() || udhaarCust?.phone || "";
   const profit = billItems.reduce((a,b)=>a+(b.sale_price-b.cost_price)*b.qty-(b.discount||0),0);
 
   const confirmSale = async () => {
@@ -74,12 +79,12 @@ export default function Billing() {
     if(isUdhaar&&!udhaarCustId) return notify("❌ Please select a credit customer");
     setLoading(true);
     try {
-      const sale = await api.createSale({ customer:customer||"Walk-in Customer", items:billItems.map(b=>({item_id:b.id,qty:b.qty,discount:b.discount||0})) });
+      const sale = await api.createSale({ customer:billCustomer, prev_balance:prevBalance, items:billItems.map(b=>({item_id:b.id,qty:b.qty,discount:b.discount||0})) });
       if(isUdhaar&&udhaarCustId) {
         await creditApi.addEntry({ customer_id:+udhaarCustId, type:"debit", amount:total, description:`Credit sale - ${billNo}`, sale_id:sale.id }).catch(()=>{});
       }
-      openBill({ billItems, customer:customer||"Walk-in Customer", phone, total, billNo, saleDate:sale.sale_date });
-      notify(`✅ Sale confirmed! Total: Rs.${total.toFixed(0)} | Profit: Rs.${profit.toFixed(0)}${isUdhaar?" | Added to credit book":""}`);
+      openBill({ billItems, customer:billCustomer, phone:billPhone, billNo, saleDate:sale.sale_date, prevBalance });
+      notify(`✅ Sale confirmed! Total: Rs.${grandTotal.toFixed(0)} | Profit: Rs.${profit.toFixed(0)}${isUdhaar?" | Added to credit book":""}`);
       setBillItems([]); setCustomer(""); setPhone(""); setBillNo(genBillNo()); setIsUdhaar(false); setUdhaarCustId(""); load();
     } catch(e) { notify("❌ "+e.message); }
     finally { setLoading(false); }
@@ -169,7 +174,9 @@ export default function Billing() {
             <div className="bill-summary">
               {totalDiscount>0 && <div className="bill-profit-row"><span>Subtotal</span><span>Rs. {subtotal.toFixed(0)}</span></div>}
               {totalDiscount>0 && <div className="bill-profit-row"><span>Discount</span><span style={{color:"var(--red)"}}>− Rs. {totalDiscount.toFixed(0)}</span></div>}
-              <div className="bill-total-row"><span>Total</span><span>Rs. {total.toFixed(0)}</span></div>
+              {prevBalance>0 && <div className="bill-profit-row"><span>Bill Total</span><span>Rs. {total.toFixed(0)}</span></div>}
+              {prevBalance>0 && <div className="bill-profit-row"><span>Previous Balance</span><span style={{color:"var(--red)"}}>+ Rs. {prevBalance.toFixed(0)}</span></div>}
+              <div className="bill-total-row"><span>{prevBalance>0?"Grand Total":"Total"}</span><span>Rs. {grandTotal.toFixed(0)}</span></div>
               <div className="bill-profit-row"><span>Profit</span><span className="green">Rs. {profit.toFixed(0)}</span></div>
             </div>
             <div className="udhaar-toggle-box">
@@ -188,7 +195,7 @@ export default function Billing() {
             <button className="btn-success full-width" style={{fontSize:"14px",padding:"13px",letterSpacing:"0.02em"}} onClick={confirmSale} disabled={loading}>
               {loading?"Processing...":isUdhaar?"📒 Confirm Credit Sale & Print Bill":"✅ Confirm Sale & Generate Bill"}
             </button>
-            <button className="btn-outline full-width" style={{marginTop:"6px"}} onClick={()=>{if(billItems.length)openBill({billItems,customer:customer||"Walk-in Customer",phone,total,billNo});}}>🖨️ Preview Bill</button>
+            <button className="btn-outline full-width" style={{marginTop:"6px"}} onClick={()=>{if(billItems.length)openBill({billItems,customer:billCustomer,phone:billPhone,billNo,prevBalance});}}>🖨️ Preview Bill</button>
             <button className="btn-sm btn-danger" style={{marginTop:"8px",width:"100%",padding:"8px"}} onClick={()=>{if(confirm("Clear all items?"))setBillItems([]);}}>🗑️ Clear Bill</button>
           </>}
         </div>
@@ -202,7 +209,7 @@ export default function Billing() {
                 <div className="receipt-shop">🏪 {shopBrand.shop_name.toUpperCase()}</div>
                 <div className="receipt-meta" style={{fontSize:"10px",marginBottom:"8px"}}>{shopBrand.shop_tagline}</div>
                 <div style={{borderTop:"2px solid var(--border2)",margin:"8px 0"}}/>
-                {[["Invoice",billNo],["Date",new Date().toLocaleDateString()],["Customer",customer||"Walk-in Customer"],...(phone?[["Phone",phone]]:[])].map(([l,v])=>(
+                {[["Invoice",billNo],["Date",new Date().toLocaleDateString()],["Customer",billCustomer],...(billPhone?[["Phone",billPhone]]:[])].map(([l,v])=>(
                   <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:"11px",marginBottom:"2px"}}>
                     <span style={{color:"var(--text2)"}}>{l}:</span><strong>{v}</strong>
                   </div>
@@ -211,12 +218,12 @@ export default function Billing() {
               <div className="receipt-divider"/>
               <table className="receipt-table">
                 <thead><tr><th style={{width:"38%"}}>Item</th><th style={{textAlign:"center"}}>Qty</th><th style={{textAlign:"right"}}>Rate</th><th style={{textAlign:"right"}}>Amt</th></tr></thead>
-                <tbody>{billItems.map(b=><tr key={b.id}><td>{b.name}{b.discount>0 && <div style={{fontSize:"9px",color:"var(--red)"}}>− {shopBrand.currency_symbol}{b.discount.toFixed(0)} off</div>}</td><td style={{textAlign:"center"}}>{b.qty}</td><td style={{textAlign:"right"}}>{shopBrand.currency_symbol}{b.sale_price}</td><td style={{textAlign:"right"}}><strong>{shopBrand.currency_symbol}{(b.qty*b.sale_price-(b.discount||0)).toFixed(0)}</strong></td></tr>)}</tbody>
+                <tbody>{billItems.map(b=><tr key={b.id}><td>{b.name}</td><td style={{textAlign:"center"}}>{b.qty}</td><td style={{textAlign:"right"}}>{shopBrand.currency_symbol}{billRate(b)}</td><td style={{textAlign:"right"}}><strong>{shopBrand.currency_symbol}{(b.qty*b.sale_price-(b.discount||0)).toFixed(0)}</strong></td></tr>)}</tbody>
               </table>
               <div className="receipt-divider"/>
-              {totalDiscount>0 && <div style={{display:"flex",justifyContent:"space-between",fontSize:"11px",color:"var(--text2)",marginBottom:"2px"}}><span>Subtotal</span><span>{shopBrand.currency_symbol} {subtotal.toFixed(0)}</span></div>}
-              {totalDiscount>0 && <div style={{display:"flex",justifyContent:"space-between",fontSize:"11px",color:"var(--red)",marginBottom:"6px"}}><span>Discount</span><span>− {shopBrand.currency_symbol} {totalDiscount.toFixed(0)}</span></div>}
-              <div className="receipt-total"><span>TOTAL</span><span>{shopBrand.currency_symbol} {total.toFixed(0)}</span></div>
+              {prevBalance>0 && <div style={{display:"flex",justifyContent:"space-between",fontSize:"11px",color:"var(--text2)",marginBottom:"2px"}}><span>Subtotal</span><span>{shopBrand.currency_symbol} {total.toFixed(0)}</span></div>}
+              {prevBalance>0 && <div style={{display:"flex",justifyContent:"space-between",fontSize:"11px",color:"var(--text2)",marginBottom:"6px"}}><span>Previous Balance</span><span>{shopBrand.currency_symbol} {prevBalance.toFixed(0)}</span></div>}
+              <div className="receipt-total"><span>TOTAL</span><span>{shopBrand.currency_symbol} {grandTotal.toFixed(0)}</span></div>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:"11px",color:"var(--green)",marginTop:"4px",fontStyle:"italic"}}><span>(Profit — not printed)</span><span>{shopBrand.currency_symbol} {profit.toFixed(0)}</span></div>
               <div className="receipt-footer">★ Thank you for your purchase! ★<br/><span style={{fontSize:"10px"}}>Please visit again</span></div>
             </div>}

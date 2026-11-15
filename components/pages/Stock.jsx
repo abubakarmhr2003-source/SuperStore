@@ -30,6 +30,8 @@ export default function Stock() {
     catch(e) { notify("❌ "+e.message); }
   };
   const filtered = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()) || i.category.toLowerCase().includes(search.toLowerCase()));
+  const outOfStock = items.filter(i => i.qty === 0);
+  const lowStock   = items.filter(i => i.qty > 0 && i.qty < 10);
   const totalPcs = items.reduce((a,i)=>a+i.qty,0);
   const totalVal = items.reduce((a,i)=>a+i.qty*i.cost_price,0);
   return (
@@ -40,6 +42,25 @@ export default function Stock() {
         <div className="metric-card metric-blue"><span className="metric-icon">📦</span><div className="metric-label">Total Items</div><div className="metric-value">{items.length}</div></div>
         <div className="metric-card metric-green"><span className="metric-icon">🔢</span><div className="metric-label">Total Pieces</div><div className="metric-value">{totalPcs.toLocaleString()}</div></div>
         <div className="metric-card metric-amber"><span className="metric-icon">💵</span><div className="metric-label">Stock Value</div><div className="metric-value">Rs. {totalVal.toLocaleString()}</div></div>
+      </div>
+      <div className="card" style={{marginBottom:"1rem"}}>
+        <h2 className="card-title">⚠️ Stock Alerts</h2>
+        {outOfStock.length===0 && lowStock.length===0
+          ? <p className="empty">✅ All stock levels are fine</p>
+          : <>
+            {outOfStock.map(i=>(
+              <div key={i.id} className="alert-row">
+                <span className="bold">{i.name}</span>
+                <span className="badge red">Out of Stock</span>
+              </div>
+            ))}
+            {lowStock.map(i=>(
+              <div key={i.id} className="alert-row">
+                <span>{i.name}</span>
+                <span className="badge orange">{i.qty} left</span>
+              </div>
+            ))}
+          </>}
       </div>
       <div className="two-col" style={{marginBottom:"1rem"}}>
         <div className="card">

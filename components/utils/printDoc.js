@@ -27,14 +27,27 @@ export function waNumber(phone) {
   return n;
 }
 
-/* items: [{ name, qty, sale_price, discount?, line_total? }] */
-export function buildBillHtml({ shop, billNo, date, customer, phone, items }) {
+// Amount of one bill line AFTER discount.
+export function billLineAmt(b) {
+  return b.line_total != null ? Number(b.line_total) : b.qty * b.sale_price - (b.discount || 0);
+}
+
+// Rate shown on the bill. The discount is NOT printed on the bill, so the rate
+// is the effective (discounted) price per piece: Rate x Qty always = Amt.
+export function billRate(b) {
+  const r = b.qty > 0 ? billLineAmt(b) / b.qty : Number(b.sale_price);
+  const rounded = Math.round(r * 100) / 100;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
+}
+
+/* items: [{ name, qty, sale_price, discount?, line_total? }]
+   prevBalance: customer's old unpaid (udhaar) balance, added to the bill total. */
+export function buildBillHtml({ shop, billNo, date, customer, phone, items, prevBalance = 0 }) {
   const cur = esc(shop.currency_symbol);
-  const lineAmt = (b) =>
-    b.line_total != null ? Number(b.line_total) : b.qty * b.sale_price - (b.discount || 0);
-  const subtotal = items.reduce((a, b) => a + b.qty * b.sale_price, 0);
-  const totalDiscount = items.reduce((a, b) => a + (b.discount || 0), 0);
-  const total = items.reduce((a, b) => a + lineAmt(b), 0);
+  const lineAmt = billLineAmt;
+  const prev = Math.max(0, Number(prevBalance) || 0);
+  const subtotal = items.reduce((a, b) => a + lineAmt(b), 0);
+  const total = subtotal + prev;
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(billNo)}</title>
   <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;width:320px;max-width:100%;margin:auto;padding:14px;background:#fff;color:#000}
@@ -56,20 +69,21 @@ export function buildBillHtml({ shop, billNo, date, customer, phone, items }) {
   <div class="row"><span class="muted">Customer:</span><strong>${esc(customer || "Walk-in")}</strong></div>
   ${phone ? `<div class="row"><span class="muted">Phone:</span><span>${esc(phone)}</span></div>` : ""}
   <hr><table><thead><tr><th>#</th><th>Item</th><th class="center">Qty</th><th class="right">Rate</th><th class="right">Amt</th></tr></thead>
-  <tbody>${items.map((b, i) => `<tr><td style="color:#999">${i + 1}</td><td>${esc(b.name)}${b.discount ? `<br><span class="disc" style="font-size:9px">− ${cur}${Number(b.discount).toFixed(0)} off</span>` : ""}</td><td class="center">${b.qty}</td><td class="right">${cur}${b.sale_price}</td><td class="right"><b>${cur}${lineAmt(b).toFixed(0)}</b></td></tr>`).join("")}</tbody></table>
+  <tbody>${items.map((b, i) => `<tr><td style="color:#999">${i + 1}</td><td>${esc(b.name)}</td><td class="center">${b.qty}</td><td class="right">${cur}${billRate(b)}</td><td class="right"><b>${cur}${lineAmt(b).toFixed(0)}</b></td></tr>`).join("")}</tbody></table>
   <hr>
-  ${totalDiscount > 0 ? `<div class="row"><span class="muted">Subtotal:</span><span>${cur} ${subtotal.toFixed(0)}</span></div><div class="row disc"><span>Discount:</span><span>− ${cur} ${totalDiscount.toFixed(0)}</span></div>` : ""}
+  ${prev > 0 ? `<div class="row"><span class="muted">Subtotal:</span><span>${cur} ${subtotal.toFixed(0)}</span></div><div class="row"><span class="muted">Previous Balance:</span><span>${cur} ${prev.toFixed(0)}</span></div>` : ""}
   <div class="total"><span>TOTAL</span><span>${cur} ${total.toFixed(0)}</span></div><hr class="hr2">
   <div class="footer">★ Thank you for your purchase! ★<br>Please visit again<br>${esc(date.toLocaleString())}</div>
   </body></html>`;
 }
 
 // Plain-text version of the bill, used for Share / WhatsApp.
-export function buildBillText({ shop, billNo, date, customer, items }) {
+export function buildBillText({ shop, billNo, date, customer, items, prevBalance = 0 }) {
   const cur = shop.currency_symbol;
-  const lineAmt = (b) =>
-    b.line_total != null ? Number(b.line_total) : b.qty * b.sale_price - (b.discount || 0);
-  const total = items.reduce((a, b) => a + lineAmt(b), 0);
+  const lineAmt = billLineAmt;
+  const prev = Math.max(0, Number(prevBalance) || 0);
+  const subtotal = items.reduce((a, b) => a + lineAmt(b), 0);
+  const total = subtotal + prev;
   const lines = items.map((b) => `• ${b.name} x${b.qty} = ${cur}${lineAmt(b).toFixed(0)}`);
   return [
     `🏪 ${shop.shop_name}`,
@@ -80,6 +94,7 @@ export function buildBillText({ shop, billNo, date, customer, items }) {
     "",
     ...lines,
     "",
+    ...(prev > 0 ? [`Subtotal: ${cur} ${subtotal.toFixed(0)}`, `Previous Balance: ${cur} ${prev.toFixed(0)}`] : []),
     `TOTAL: ${cur} ${total.toFixed(0)}`,
     "",
     "Thank you for your purchase! Please visit again.",
@@ -156,9 +171,9 @@ export function openDocument({ html, title = "Document", shareText = "", phone =
 }
 
 // One-call helper used by Billing (new sale / preview) and History (reprint).
-export function showBill({ shop, billNo, date, customer, phone, items }) {
+export function showBill({ shop, billNo, date, customer, phone, items, prevBalance = 0 }) {
   const d = date ? new Date(date) : new Date();
-  const args = { shop, billNo, date: d, customer, phone, items };
+  const args = { shop, billNo, date: d, customer, phone, items, prevBalance };
   openDocument({
     html: buildBillHtml(args),
     title: `Bill ${billNo}`,

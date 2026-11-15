@@ -6,7 +6,6 @@ const fmt = v => Number(v ?? 0).toLocaleString();
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [items, setItems] = useState([]);
-  const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const mounted = useRef(true);
@@ -14,17 +13,17 @@ export default function Dashboard() {
   useEffect(() => {
     mounted.current = true;
     setLoading(true); setError(null);
-    Promise.allSettled([api.getStats(), api.getItems(), api.getSales()])
+    Promise.allSettled([api.getStats(), api.getItems()])
       .then(res => {
         if (!mounted.current) return;
-        const names = ["stats", "items", "sales"];
+        const names = ["stats", "items"];
         const failed = res.map((r, k) => r.status === "rejected" ? `${names[k]}: ${r.reason?.message}` : null).filter(Boolean);
         if (failed.length) return setError(failed.join(" | "));
         const st = res[0].value;
         if (!st || typeof st !== "object" || st.total_revenue === undefined || st.today_revenue === undefined) {
           return setError("stats returned unexpected data: " + JSON.stringify(st).slice(0, 250));
         }
-        setStats(st); setItems(res[1].value); setSales(res[2].value);
+        setStats(st); setItems(res[1].value);
       })
       .finally(() => { if (mounted.current) setLoading(false); });
     return () => { mounted.current = false; };
@@ -43,10 +42,7 @@ export default function Dashboard() {
     </div>
   );
 
-  const lowStock   = items.filter(i => i.qty < 10 && i.qty > 0);
-  const outOfStock = items.filter(i => i.qty === 0);
   const topSelling = [...items].sort((a, b) => b.sold - a.sold).filter(i => i.sold > 0).slice(0, 5);
-  const recent5    = sales.slice(0, 5);
 
   return (
     <div className="page">
@@ -55,56 +51,19 @@ export default function Dashboard() {
         <span className="date-badge">{new Date().toLocaleDateString("en-PK", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</span>
       </div>
 
-      <div className="metrics-grid">
+      <WeekChart week={stats.week || []} />
+
+      <div className="metrics-grid five">
         <Metric label="Today's Sales"   value={`Rs. ${fmt(stats.today_revenue)}`}  color="blue"   icon="📈" />
         <Metric label="Today's Profit"  value={`Rs. ${fmt(stats.today_profit)}`}   color="green"  icon="💰" />
+        <Metric label="Today's Credit"  value={`Rs. ${fmt(stats.today_credit)}`}  color="red"    icon="📒" />
+        <Metric label="Total Credit"    value={`Rs. ${fmt(stats.total_credit)}`}  color="orange" icon="📚" />
         <Metric label="Total Revenue"   value={`Rs. ${fmt(stats.total_revenue)}`}  color="purple" icon="🏦" />
         <Metric label="Net Profit"      value={`Rs. ${fmt(stats.net_profit)}`}     color={stats.net_profit >= 0 ? "teal" : "red"} icon="📊" />
         <Metric label="Stock Value"     value={`Rs. ${fmt(stats.stock_value)}`}    color="amber"  icon="📦" />
         <Metric label="Total Sales"     value={stats.total_sales_count}                        color="blue"   icon="🧾" />
         <Metric label="Low Stock Items" value={stats.low_stock}                                color="orange" icon="⚠️" />
         <Metric label="Out of Stock"    value={stats.out_of_stock}                             color="red"    icon="❌" />
-      </div>
-
-      <div className="two-col" style={{ marginBottom: "1rem" }}>
-        <div className="card">
-          <h2 className="card-title">Recent Sales</h2>
-          {recent5.length === 0 ? <p className="empty">No sales yet</p> : (
-            <table className="simple-table">
-              <thead><tr><th>Customer</th><th>Items</th><th>Total</th><th>Profit</th></tr></thead>
-              <tbody>
-                {recent5.map(s => (
-                  <tr key={s.id}>
-                    <td className="bold">{s.customer}</td>
-                    <td className="muted">{s.items_json.map(i => i.name).join(", ")}</td>
-                    <td className="bold">Rs. {Number(s.total||0).toFixed(0)}</td>
-                    <td className="green">Rs. {Number(s.profit||0).toFixed(0)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-
-        <div className="card">
-          <h2 className="card-title">Stock Alerts</h2>
-          {outOfStock.length === 0 && lowStock.length === 0
-            ? <p className="empty">✅ All stock levels are fine</p>
-            : <>
-              {outOfStock.map(i => (
-                <div key={i.id} className="alert-row">
-                  <span className="bold">{i.name}</span>
-                  <span className="badge red">Out of Stock</span>
-                </div>
-              ))}
-              {lowStock.map(i => (
-                <div key={i.id} className="alert-row">
-                  <span>{i.name}</span>
-                  <span className="badge orange">{i.qty} left</span>
-                </div>
-              ))}
-            </>}
-        </div>
       </div>
 
       <div className="card">
@@ -121,6 +80,44 @@ export default function Dashboard() {
             );
           })}
       </div>
+    </div>
+  );
+}
+
+const short = v => {
+  const n = Number(v || 0);
+  return n >= 100000 ? (n / 1000).toFixed(0) + "k" : n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(Math.round(n));
+};
+const dayLabel = d => new Date(d + "T00:00:00Z").toLocaleDateString("en-GB", { weekday: "short", day: "numeric", timeZone: "UTC" });
+
+function WeekChart({ week }) {
+  const max = Math.max(1, ...week.map(d => d.revenue));
+  const totRev = week.reduce((a, d) => a + d.revenue, 0);
+  const totPro = week.reduce((a, d) => a + d.profit, 0);
+  return (
+    <div className="card week-chart">
+      <div className="week-head">
+        <h2 className="card-title" style={{ margin: 0 }}>📊 Last 7 Days</h2>
+        <div className="week-legend">
+          <span><i style={{ background: "var(--blue)" }} />Sales</span>
+          <span><i style={{ background: "var(--green)" }} />Profit</span>
+        </div>
+      </div>
+      <div className="week-bars">
+        {week.map((d, k) => {
+          const isToday = k === week.length - 1;
+          return (
+            <div key={d.day} className={"week-col" + (isToday ? " today" : "")} title={`${dayLabel(d.day)} — Sales Rs. ${fmt(d.revenue)} | Profit Rs. ${fmt(d.profit)}`}>
+              <div className="week-pair">
+                <div className="week-bar-wrap"><span className="week-val">{short(d.revenue)}</span><div className="week-bar sales" style={{ height: `${(d.revenue / max) * 100}%` }} /></div>
+                <div className="week-bar-wrap"><span className="week-val">{short(d.profit)}</span><div className="week-bar profit" style={{ height: `${(d.profit / max) * 100}%` }} /></div>
+              </div>
+              <div className="week-label">{isToday ? "Today" : dayLabel(d.day)}</div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="week-foot">Week total: <strong>Sales Rs. {fmt(totRev)}</strong> · <strong className="green">Profit Rs. {fmt(totPro)}</strong></div>
     </div>
   );
 }
