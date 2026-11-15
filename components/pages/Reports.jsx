@@ -94,7 +94,7 @@ export default function Reports() {
       const header = ["#", "Item Name", "Category", "Stock (pcs)", "Cost Price (Rs)", "Sale Price (Rs)", "Profit/pc (Rs)", "Margin %", "Stock Value (Rs)", "Units Sold", "Status"];
       const rows = items.map((item, i) => {
         const margin = item.cost_price > 0 ? ((item.sale_price - item.cost_price) / item.cost_price * 100) : 0;
-        const status = item.qty === 0 ? "Out of Stock" : item.qty < 10 ? "Low Stock" : "In Stock";
+        const status = item.qty === 0 ? "Out of Stock" : item.qty <= (item.low_stock_limit ?? 10) ? "Low Stock" : "In Stock";
         return [
           i + 1, item.name, item.category,
           item.qty, item.cost_price, item.sale_price,
@@ -332,7 +332,7 @@ export default function Reports() {
         +(it.sale_price-it.cost_price).toFixed(2),
         +(it.qty*it.cost_price).toFixed(2),
         it.sold||0,
-        it.qty===0?"Out of Stock":it.qty<10?"Low Stock":"In Stock",
+        it.qty===0?"Out of Stock":it.qty<=(it.low_stock_limit ?? 10)?"Low Stock":"In Stock",
       ]);
       const wsStock = XLSX.utils.aoa_to_sheet([stockH,...stockR]);
       applyHeaderStyle(wsStock,stockH); autoWidth(wsStock);

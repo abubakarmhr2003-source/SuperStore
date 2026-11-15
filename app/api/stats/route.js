@@ -22,7 +22,7 @@ export async function GET(req) {
         (SELECT COALESCE(SUM(total),0)::float8         FROM sales    WHERE shop_id=$1) AS revenue,
         (SELECT COUNT(*)::int                          FROM sales    WHERE shop_id=$1) AS sales_count,
         (SELECT COALESCE(SUM(qty*cost_price),0)::float8 FROM items   WHERE shop_id=$1) AS stock_value,
-        (SELECT COUNT(*)::int FROM items WHERE shop_id=$1 AND qty<10 AND qty>0) AS low_stock,
+        (SELECT COUNT(*)::int FROM items WHERE shop_id=$1 AND qty>0 AND qty<=COALESCE(low_stock_limit,10)) AS low_stock,
         (SELECT COUNT(*)::int FROM items WHERE shop_id=$1 AND qty=0)            AS out_of_stock,
         (SELECT COALESCE(SUM(CASE WHEN type='debit' THEN amount ELSE -amount END),0)::float8 FROM credit_ledger WHERE shop_id=$1) AS total_credit`,
       [sid]

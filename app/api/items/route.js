@@ -24,6 +24,9 @@ export async function POST(req) {
     const costPrice = data.cost_price;
     const salePrice = data.sale_price;
     const totalQty = boxes * piecesPerBox;
+    // Per-item alert level: "warn me when only this many pieces are left". Blank = keep / use 10.
+    const limRaw = data.low_stock_limit;
+    const lowLimit = limRaw === undefined || limRaw === null || limRaw === "" || !(+limRaw >= 0) ? null : Math.floor(+limRaw);
 
     const existing = await row(
       "SELECT * FROM items WHERE shop_id=$1 AND LOWER(name)=LOWER($2)",
@@ -32,14 +35,14 @@ export async function POST(req) {
     let item;
     if (existing) {
       await query(
-        "UPDATE items SET qty=qty+$1,cost_price=$2,sale_price=$3 WHERE id=$4 AND shop_id=$5",
-        [totalQty, costPrice, salePrice, existing.id, user.shop_id]
+        "UPDATE items SET qty=qty+$1,cost_price=$2,sale_price=$3,low_stock_limit=COALESCE($6,low_stock_limit) WHERE id=$4 AND shop_id=$5",
+        [totalQty, costPrice, salePrice, existing.id, user.shop_id, lowLimit]
       );
       item = await row("SELECT * FROM items WHERE id=$1", [existing.id]);
     } else {
       item = await row(
-        "INSERT INTO items (shop_id,name,category,qty,cost_price,sale_price) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *",
-        [user.shop_id, name, category, totalQty, costPrice, salePrice]
+        "INSERT INTO items (shop_id,name,category,qty,cost_price,sale_price,low_stock_limit) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *",
+        [user.shop_id, name, category, totalQty, costPrice, salePrice, lowLimit ?? 10]
       );
     }
     return NextResponse.json(item);
