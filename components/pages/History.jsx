@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { api } from "../utils/api";
 import { getShopInfo } from "../utils/shopInfo";
 import { showBill } from "../utils/printDoc";
@@ -60,6 +61,13 @@ export default function History() {
     api.getItems().then(setAllItems).catch(()=>{});
   };
   const closeEdit = () => { setEditing(null); setEItems([]); };
+  // Edit window opens exactly on the current screen; page behind it doesn't scroll.
+  useEffect(() => {
+    if (!editing) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [editing]);
   const setLine = (id, patch) => setEItems(list => list.map(i => {
     if (i.id !== id) return i;
     const n = { ...i, ...patch };
@@ -151,7 +159,7 @@ export default function History() {
             </div>
           ))}
       </div>
-      {editing && (
+      {editing && typeof document !== "undefined" && createPortal(
         <div className="edit-overlay" onMouseDown={e=>{ if(e.target===e.currentTarget) closeEdit(); }}>
           <div className="edit-modal">
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"10px"}}>
@@ -209,7 +217,8 @@ export default function History() {
               <button className="btn-success" style={{flex:2}} onClick={saveEdit} disabled={saving}>{saving?"Saving...":"💾 Save Changes"}</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
