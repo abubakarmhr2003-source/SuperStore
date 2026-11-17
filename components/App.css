@@ -1033,11 +1033,12 @@ button { cursor: pointer; font-family: inherit; transition: all 0.2s cubic-bezie
 
 /* ── Edit sale modal (History) ── */
 .edit-overlay {
-  position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.65);
+  position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,0.65);
   display: flex; align-items: center; justify-content: center; padding: 12px;
 }
 .edit-modal {
-  width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto;
+  width: 100%; max-width: 560px; max-height: 92vh; max-height: 92dvh; overflow-y: auto;
+  overscroll-behavior: contain;
   background: var(--pop-bg); border: 1px solid var(--border2);
   border-radius: 14px; padding: 18px; box-shadow: var(--shadow);
 }
