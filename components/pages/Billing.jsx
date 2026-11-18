@@ -28,6 +28,8 @@ export default function Billing() {
   const [creditCustomers, setCreditCustomers] = useState([]);
   const [isUdhaar, setIsUdhaar] = useState(false);
   const [udhaarCustId, setUdhaarCustId] = useState("");
+  const [custSearch, setCustSearch] = useState("");
+  const [showCustList, setShowCustList] = useState(false);
   const [shopBrand] = useState(getShopInfo());
 
   const load = () => {
@@ -53,6 +55,14 @@ export default function Billing() {
 
   const q = search.trim().toLowerCase();
   const matches = items.filter(i => !q || i.name.toLowerCase().includes(q));
+  // Credit customer search: by name or phone number
+  const cq = custSearch.trim().toLowerCase();
+  const cqDigits = cq.replace(/\D/g, "");
+  const custMatches = creditCustomers.filter(c => !cq
+    || c.name.toLowerCase().includes(cq)
+    || (cqDigits && String(c.phone||"").replace(/\D/g, "").includes(cqDigits)));
+  const pickCust = c => { setUdhaarCustId(String(c.id)); setCustSearch(c.name); setShowCustList(false); };
+  const clearCust = () => { setUdhaarCustId(""); setCustSearch(""); };
   const pickItem = i => { setSelItem(String(i.id)); setSearch(i.name); setShowList(false); };
 
   const setDiscount = (id, value) => {
@@ -87,7 +97,7 @@ export default function Billing() {
       }
       openBill({ billItems, customer:billCustomer, phone:billPhone, billNo, saleDate:sale.sale_date, prevBalance });
       notify(`✅ Sale confirmed! Total: Rs.${grandTotal.toFixed(0)} | Profit: Rs.${profit.toFixed(0)}${isUdhaar?" | Added to credit book":""}`);
-      setBillItems([]); setCustomer(""); setPhone(""); setBillNo(genBillNo()); setIsUdhaar(false); setUdhaarCustId(""); load();
+      setBillItems([]); setCustomer(""); setPhone(""); setBillNo(genBillNo()); setIsUdhaar(false); setUdhaarCustId(""); setCustSearch(""); setShowCustList(false); load();
     } catch(e) { notify("❌ "+e.message); }
     finally { setLoading(false); }
   };
@@ -190,14 +200,39 @@ export default function Billing() {
             </div>
             <div className="udhaar-toggle-box">
               <label style={{marginTop:0,display:"flex",alignItems:"center",gap:"9px",cursor:"pointer",fontSize:"13px",fontWeight:700,color:isUdhaar?"var(--red)":"var(--text2)"}}>
-                <input type="checkbox" checked={isUdhaar} onChange={e=>setIsUdhaar(e.target.checked)} style={{width:"16px",height:"16px",cursor:"pointer",marginBottom:0,accentColor:"var(--red)"}} />
+                <input type="checkbox" checked={isUdhaar} onChange={e=>{setIsUdhaar(e.target.checked); if(!e.target.checked) clearCust();}} style={{width:"16px",height:"16px",cursor:"pointer",marginBottom:0,accentColor:"var(--red)"}} />
                 📒 This is a Credit Sale (Udhaar)
               </label>
               {isUdhaar&&<div style={{marginTop:"10px"}}>
-                <select value={udhaarCustId} onChange={e=>setUdhaarCustId(e.target.value)} style={{marginBottom:0}}>
-                  <option value="">-- Select credit customer --</option>
-                  {creditCustomers.map(c=><option key={c.id} value={c.id}>{c.name} {c.phone?`(${c.phone})`:""} — Balance: Rs.{c.balance.toFixed(0)}</option>)}
-                </select>
+                <div className="item-search" style={{marginBottom:0}}>
+                  <input
+                    value={custSearch}
+                    placeholder="🔍 Search customer by name or phone..."
+                    autoComplete="off"
+                    onChange={e=>{setCustSearch(e.target.value); setUdhaarCustId(""); setShowCustList(true);}}
+                    onFocus={()=>setShowCustList(true)}
+                    onBlur={()=>setShowCustList(false)}
+                    onKeyDown={e=>{
+                      if(e.key==="Enter"){ e.preventDefault(); if(showCustList && custMatches.length) pickCust(custMatches[0]); }
+                      if(e.key==="Escape") setShowCustList(false);
+                    }}
+                  />
+                  {(udhaarCustId||custSearch) && <button type="button" className="item-search-clear" onMouseDown={e=>{e.preventDefault(); clearCust(); setShowCustList(true);}}>×</button>}
+                  {showCustList && (
+                    <div className="item-search-list">
+                      {custMatches.length===0
+                        ? <div className="item-search-empty">No customer found</div>
+                        : custMatches.map(c=>(
+                          <div key={c.id} className={"item-search-opt"+(String(c.id)===udhaarCustId?" active":"")}
+                            onMouseDown={e=>{e.preventDefault(); pickCust(c);}}>
+                            <span>{c.name}{c.phone?<small style={{display:"block"}}>{c.phone}</small>:null}</span>
+                            <small style={{color:c.balance>0?"var(--red)":"var(--text2)",fontWeight:700}}>Rs. {c.balance.toFixed(0)}</small>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+                {udhaarCust && <div style={{fontSize:"11px",color:"var(--text2)",marginTop:"6px"}}>✅ {udhaarCust.name}{udhaarCust.phone?` · ${udhaarCust.phone}`:""} — Previous balance: <strong style={{color:udhaarCust.balance>0?"var(--red)":"var(--green)"}}>Rs. {udhaarCust.balance.toFixed(0)}</strong></div>}
                 {!creditCustomers.length&&<div style={{fontSize:"11px",color:"var(--red)",marginTop:"4px"}}>No credit customers. Add one in Credit Book first.</div>}
               </div>}
             </div>
