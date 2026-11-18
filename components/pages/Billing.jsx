@@ -72,14 +72,16 @@ export default function Billing() {
   const grandTotal  = total + prevBalance;
   const billCustomer = customer.trim() || udhaarCust?.name || "Walk-in Customer";
   const billPhone    = phone.trim() || udhaarCust?.phone || "";
-  const profit = billItems.reduce((a,b)=>a+(b.sale_price-b.cost_price)*b.qty-(b.discount||0),0);
+  const profit = billItems.reduce((a,b)=>a+(b.cost_price>0?(b.sale_price-b.cost_price)*b.qty-(b.discount||0):0),0);   // no purchase price = profit not counted
 
   const confirmSale = async () => {
     if(!billItems.length) return notify("❌ Please add at least one item");
+    const noPrice = billItems.find(b=>!(+b.sale_price>0));
+    if(noPrice) return notify(`❌ Please enter a price for ${noPrice.name}`);
     if(isUdhaar&&!udhaarCustId) return notify("❌ Please select a credit customer");
     setLoading(true);
     try {
-      const sale = await api.createSale({ customer:billCustomer, prev_balance:prevBalance, items:billItems.map(b=>({item_id:b.id,qty:b.qty,discount:b.discount||0})) });
+      const sale = await api.createSale({ customer:billCustomer, prev_balance:prevBalance, items:billItems.map(b=>({item_id:b.id,qty:b.qty,price:b.sale_price,discount:b.discount||0})) });
       if(isUdhaar&&udhaarCustId) {
         await creditApi.addEntry({ customer_id:+udhaarCustId, type:"debit", amount:total, description:`Credit sale - ${billNo}`, sale_id:sale.id }).catch(()=>{});
       }
@@ -124,7 +126,7 @@ export default function Billing() {
                     <div key={i.id} className={"item-search-opt"+(String(i.id)===selItem?" active":"")}
                       onMouseDown={e=>{e.preventDefault(); pickItem(i);}}>
                       <span>{i.name}</span>
-                      <small>{i.qty} in stock · Rs.{i.sale_price}</small>
+                      <small>{i.qty} in stock{i.sale_price>0?` · Rs.${i.sale_price}`:""}</small>
                     </div>
                   ))}
               </div>
@@ -159,6 +161,13 @@ export default function Billing() {
                       }}
                       style={{width:"58px",textAlign:"center",fontWeight:700,padding:"4px 6px",fontSize:"13px",marginBottom:0}} />
                     <button className="qty-btn" onClick={()=>{const item=items.find(i=>i.id===b.id);if(!item||b.qty<item.qty)setBillItems(billItems.map(x=>x.id===b.id?{...x,qty:x.qty+1}:x));}}>+</button>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:"4px",flexShrink:0}}>
+                    <span style={{fontSize:"10px",color:"var(--text2)"}}>Price {shopBrand.currency_symbol}</span>
+                    <input type="number" min="0" value={b.sale_price||""} placeholder="0"
+                      onFocus={e=>e.target.select()}
+                      onChange={e=>{const v=Math.max(0,+e.target.value||0);setBillItems(billItems.map(x=>x.id===b.id?{...x,sale_price:v,discount:Math.min(x.discount||0,x.qty*v)}:x));}}
+                      style={{width:"66px",padding:"4px 6px",fontSize:"12px",fontWeight:700,marginBottom:0}} />
                   </div>
                   <div style={{display:"flex",alignItems:"center",gap:"4px",flexShrink:0}}>
                     <span style={{fontSize:"10px",color:"var(--text2)"}}>Disc {shopBrand.currency_symbol}</span>

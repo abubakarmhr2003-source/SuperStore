@@ -61,6 +61,9 @@ export async function PUT(req, { params }) {
         if (!item) throw new ApiError(400, `Item ${id} not found`);
         ({ name, sale_price, cost_price } = item);
       }
+      // Price can be changed while editing a bill.
+      if (bi.sale_price !== undefined && bi.sale_price !== null && bi.sale_price !== "" && +bi.sale_price >= 0) sale_price = +bi.sale_price;
+      if (!(sale_price > 0)) throw new ApiError(400, `Please enter a price for ${name}`);
       const gross = sale_price * qty;
       const discount = Math.max(0, Math.min(+bi.discount || 0, gross));
       newItems.push({
@@ -90,7 +93,7 @@ export async function PUT(req, { params }) {
     }
 
     const total = newItems.reduce((a, i) => a + i.line_total, 0);
-    const profit = newItems.reduce((a, i) => a + i.line_total - i.cost_price * i.qty, 0);
+    const profit = newItems.reduce((a, i) => a + (i.cost_price > 0 ? i.line_total - i.cost_price * i.qty : 0), 0);
 
     const updated = await row(
       "UPDATE sales SET customer=$1, items_json=$2, total=$3, profit=$4 WHERE id=$5 AND shop_id=$6 RETURNING *",

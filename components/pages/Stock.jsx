@@ -15,9 +15,8 @@ export default function Stock() {
   const notify = m => { setMsg(m); setTimeout(() => setMsg(""), 3000); };
   const handleAdd = async () => {
     if (!form.name.trim()) return notify("❌ Item name is required");
-    if (!form.cost_price || !form.sale_price) return notify("❌ Please enter both prices");
     try {
-      await api.addItem({ ...form, boxes:+form.boxes, pieces_per_box:+form.pieces_per_box, cost_price:+form.cost_price, sale_price:+form.sale_price, low_stock_limit:form.low_stock_limit===""?null:+form.low_stock_limit });
+      await api.addItem({ ...form, boxes:+form.boxes, pieces_per_box:+form.pieces_per_box, cost_price:form.cost_price===""?null:+form.cost_price, sale_price:form.sale_price===""?null:+form.sale_price, low_stock_limit:form.low_stock_limit===""?null:+form.low_stock_limit });
       setForm({ name:"", category:"Biscuits & Snacks", boxes:1, pieces_per_box:1, cost_price:"", sale_price:"", low_stock_limit:"" });
       load(); notify(`✅ ${form.name} added to stock!`);
     } catch(e) { notify("❌ "+e.message); }
@@ -76,12 +75,12 @@ export default function Stock() {
           </div>
           <div className="calc-box">Total pieces: <strong>{(+form.boxes||0)*(+form.pieces_per_box||0)}</strong></div>
           <div className="row-2">
-            <div><label>Cost Price (Rs.)</label><input type="number" min="0" value={form.cost_price} onChange={e=>setForm({...form,cost_price:e.target.value})} placeholder="Purchase price" /></div>
-            <div><label>Sale Price (Rs.)</label><input type="number" min="0" value={form.sale_price} onChange={e=>setForm({...form,sale_price:e.target.value})} placeholder="Selling price" /></div>
+            <div><label>Cost Price (Rs.) <small style={{opacity:.7}}>optional</small></label><input type="number" min="0" value={form.cost_price} onChange={e=>setForm({...form,cost_price:e.target.value})} placeholder="Optional" /></div>
+            <div><label>Sale Price (Rs.) <small style={{opacity:.7}}>optional</small></label><input type="number" min="0" value={form.sale_price} onChange={e=>setForm({...form,sale_price:e.target.value})} placeholder="Optional — can be set on the bill" /></div>
           </div>
           <label>Stock Alert (optional)</label>
           <input type="number" min="0" value={form.low_stock_limit} onChange={e=>setForm({...form,low_stock_limit:e.target.value})} placeholder="Alert when only this many pieces are left (default 10)" />
-          {form.cost_price&&form.sale_price&&<div className="calc-box">Profit per piece: <strong className="green">Rs. {(+form.sale_price-+form.cost_price).toFixed(0)}</strong> ({((+form.sale_price-+form.cost_price)/+form.cost_price*100).toFixed(0)}%)</div>}
+          {+form.cost_price>0&&+form.sale_price>0&&<div className="calc-box">Profit per piece: <strong className="green">Rs. {(+form.sale_price-+form.cost_price).toFixed(0)}</strong> ({((+form.sale_price-+form.cost_price)/+form.cost_price*100).toFixed(0)}%)</div>}
           <button className="btn-primary full-width" onClick={handleAdd}>Add to Stock</button>
         </div>
         <div className="card">
@@ -103,9 +102,9 @@ export default function Stock() {
                   <td className="muted">{item.category}</td>
                   <td>{editId===item.id?<input type="number" value={editData.qty} onChange={e=>setEditData({...editData,qty:e.target.value})} style={{width:"70px"}} />:`${item.qty} pcs`}</td>
                   <td>{editId===item.id?<input type="number" min="0" value={editData.low_stock_limit} onChange={e=>setEditData({...editData,low_stock_limit:e.target.value})} style={{width:"70px"}} />:`${limitOf(item)} pcs`}</td>
-                  <td>{editId===item.id?<input type="number" value={editData.cost_price} onChange={e=>setEditData({...editData,cost_price:e.target.value})} style={{width:"80px"}} />:`Rs. ${item.cost_price}`}</td>
-                  <td>{editId===item.id?<input type="number" value={editData.sale_price} onChange={e=>setEditData({...editData,sale_price:e.target.value})} style={{width:"80px"}} />:`Rs. ${item.sale_price}`}</td>
-                  <td className="green">Rs. {(item.sale_price-item.cost_price).toFixed(0)}</td>
+                  <td>{editId===item.id?<input type="number" value={editData.cost_price} onChange={e=>setEditData({...editData,cost_price:e.target.value})} style={{width:"80px"}} />:(item.cost_price>0?`Rs. ${item.cost_price}`:"—")}</td>
+                  <td>{editId===item.id?<input type="number" value={editData.sale_price} onChange={e=>setEditData({...editData,sale_price:e.target.value})} style={{width:"80px"}} />:(item.sale_price>0?`Rs. ${item.sale_price}`:"—")}</td>
+                  <td className="green">{item.cost_price>0&&item.sale_price>0?`Rs. ${(item.sale_price-item.cost_price).toFixed(0)}`:"—"}</td>
                   <td>Rs. {(item.qty*item.cost_price).toFixed(0)}</td>
                   <td><span className={`badge ${item.qty===0?"red":item.qty<=limitOf(item)?"orange":"green"}`}>{item.qty===0?"Out":item.qty<=limitOf(item)?"Low":"OK"}</span></td>
                   <td>{editId===item.id

@@ -31,16 +31,20 @@ export async function POST(req) {
       if (!item) throw new ApiError(400, `Item ${bi.item_id} not found`);
       if (item.qty < bi.qty) throw new ApiError(400, `Not enough stock for ${item.name}`);
 
-      const gross = item.sale_price * bi.qty;
+      // Price typed on the bill wins; otherwise the item's saved price.
+      const price = bi.price !== undefined && bi.price !== null && bi.price !== "" && +bi.price >= 0 ? +bi.price : item.sale_price;
+      if (!(price > 0)) throw new ApiError(400, `Please enter a price for ${item.name}`);
+      const gross = price * bi.qty;
       const disc = Math.max(0, Math.min(bi.discount || 0, gross));
       const lt = gross - disc;
-      const lp = lt - item.cost_price * bi.qty;
+      // No purchase price saved (0) = profit unknown, so it is not counted.
+      const lp = item.cost_price > 0 ? lt - item.cost_price * bi.qty : 0;
       total += lt;
       profit += lp;
 
       saleItems.push({
         id: item.id, name: item.name, qty: bi.qty,
-        sale_price: item.sale_price, cost_price: item.cost_price,
+        sale_price: price, cost_price: item.cost_price,
         discount: disc, line_total: lt,
       });
 

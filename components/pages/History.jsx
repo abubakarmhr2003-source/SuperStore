@@ -81,14 +81,16 @@ export default function History() {
     setAddSearch("");
   };
   const eTotal  = eItems.reduce((a,i)=>a+i.qty*i.sale_price-(i.discount||0),0);
-  const eProfit = eItems.reduce((a,i)=>a+(i.sale_price-i.cost_price)*i.qty-(i.discount||0),0);
+  const eProfit = eItems.reduce((a,i)=>a+(i.cost_price>0?(i.sale_price-i.cost_price)*i.qty-(i.discount||0):0),0);
   const saveEdit = async () => {
     if(!eItems.length) return setEditErr("Add at least one item (or delete the sale)");
+    const noPrice = eItems.find(i => !(+i.sale_price > 0));
+    if(noPrice) return setEditErr(`Please enter a price for ${noPrice.name}`);
     setSaving(true); setEditErr("");
     try {
       await api.updateSale(editing.id, {
         customer: eCustomer,
-        items: eItems.map(i => ({ id:i.id, qty:i.qty, discount:i.discount||0 })),
+        items: eItems.map(i => ({ id:i.id, qty:i.qty, sale_price:i.sale_price, discount:i.discount||0 })),
       });
       closeEdit(); load(); notify("✅ Sale updated, stock adjusted");
     } catch(e) { setEditErr(e.message); }
@@ -174,7 +176,13 @@ export default function History() {
             <label>Items</label>
             {eItems.map(i=>(
               <div key={i.id} className="bill-row" style={{flexWrap:"wrap",gap:"6px"}}>
-                <span className="bill-name" style={{flex:"1 1 120px"}}>{i.name} <small style={{color:"var(--text2)"}}>@ Rs.{i.sale_price}</small></span>
+                <span className="bill-name" style={{flex:"1 1 120px"}}>{i.name}</span>
+                <div style={{display:"flex",alignItems:"center",gap:"4px"}}>
+                  <span style={{fontSize:"10px",color:"var(--text2)"}}>Price</span>
+                  <input type="number" min="0" value={i.sale_price||""} placeholder="0"
+                    onChange={e=>setLine(i.id,{sale_price:Math.max(0,+e.target.value||0)})}
+                    style={{width:"70px",padding:"4px 6px",fontSize:"12px",fontWeight:700,marginBottom:0}} />
+                </div>
                 <div style={{display:"flex",alignItems:"center",gap:"4px"}}>
                   <span style={{fontSize:"10px",color:"var(--text2)"}}>Qty</span>
                   <input type="number" min="1" value={i.qty}
@@ -201,7 +209,7 @@ export default function History() {
                     ? <div className="item-search-empty">No item found</div>
                     : addMatches.map(it=>(
                       <div key={it.id} className="item-search-opt" onMouseDown={e=>{e.preventDefault();addLine(it);}}>
-                        <span>{it.name}</span><small>{it.qty} in stock · Rs.{it.sale_price}</small>
+                        <span>{it.name}</span><small>{it.qty} in stock{it.sale_price>0?` · Rs.${it.sale_price}`:""}</small>
                       </div>
                     ))}
                 </div>
