@@ -7,21 +7,22 @@ export async function GET(req) {
   return withErrorHandling(async () => {
     await ensureSchema();
     const user = await verifyToken(req);
-    const customers = await rows("SELECT * FROM credit_customers WHERE shop_id=$1 ORDER BY name", [user.shop_id]);
-    const result = [];
-    for (const c of customers) {
-      const td = await row(
-        "SELECT COALESCE(SUM(amount),0) AS v FROM credit_ledger WHERE customer_id=$1 AND type='debit' AND shop_id=$2",
-        [c.id, user.shop_id]
-      );
-      const tp = await row(
-        "SELECT COALESCE(SUM(amount),0) AS v FROM credit_ledger WHERE customer_id=$1 AND type='payment' AND shop_id=$2",
-        [c.id, user.shop_id]
-      );
-      const totalDebit = Number(td.v);
-      const totalPayment = Number(tp.v);
-      result.push({ ...c, total_debit: totalDebit, total_payment: totalPayment, balance: totalDebit - totalPayment });
-    }
+    // One query for everyone (was 2 queries per customer, one after another).
+    const list = await rows(
+      `SELECT c.*,
+              COALESCE(SUM(CASE WHEN l.type='debit'   THEN l.amount::float8 END),0) AS total_debit,
+              COALESCE(SUM(CASE WHEN l.type='payment' THEN l.amount::float8 END),0) AS total_payment
+         FROM credit_customers c
+         LEFT JOIN credit_ledger l ON l.customer_id=c.id AND l.shop_id=c.shop_id
+        WHERE c.shop_id=$1
+        GROUP BY c.id
+        ORDER BY c.name`,
+      [user.shop_id]
+    );
+    const result = list.map(c => {
+      const totalDebit = Number(c.total_debit), totalPayment = Number(c.total_payment);
+      return { ...c, total_debit: totalDebit, total_payment: totalPayment, balance: totalDebit - totalPayment };
+    });
     return NextResponse.json(result);
   });
 }

@@ -4,8 +4,8 @@ import { getShopInfo } from "../utils/shopInfo";
 import { showBill, billRate } from "../utils/printDoc";
 
 // Opens the bill in an in-page overlay (works on mobile — no popup needed).
-function openBill({ billItems, customer, phone, billNo, saleDate, prevBalance }) {
-  showBill({ shop: getShopInfo(), billNo, date: saleDate, customer, phone, items: billItems, prevBalance });
+function openBill({ billItems, customer, phone, billNo, saleDate, prevBalance, paid }) {
+  showBill({ shop: getShopInfo(), billNo, date: saleDate, customer, phone, items: billItems, prevBalance, paid });
 }
 
 function genBillNo() {
@@ -49,7 +49,7 @@ export default function Billing() {
     const already = existing?existing.qty:0;
     if(already+n>item.qty) return notify(`❌ Only ${item.qty-already} piece(s) available`);
     if(existing) setBillItems(billItems.map(b=>b.id===item.id?{...b,qty:b.qty+n}:b));
-    else setBillItems([...billItems,{id:item.id,name:item.name,sale_price:item.sale_price,cost_price:item.cost_price,qty:n,discount:0}]);
+    else setBillItems([...billItems,{id:item.id,name:item.name,sale_price:item.sale_price,cost_price:item.cost_price,pieces_per_box:item.pieces_per_box||1,qty:n,discount:0}]);
     setSelItem(""); setSearch(""); setShowList(false); setQty("");
   };
 
@@ -91,11 +91,11 @@ export default function Billing() {
     if(isUdhaar&&!udhaarCustId) return notify("❌ Please select a credit customer");
     setLoading(true);
     try {
-      const sale = await api.createSale({ customer:billCustomer, prev_balance:prevBalance, items:billItems.map(b=>({item_id:b.id,qty:b.qty,price:b.sale_price,discount:b.discount||0})) });
+      const sale = await api.createSale({ customer:billCustomer, prev_balance:prevBalance, paid:isUdhaar?0:total, items:billItems.map(b=>({item_id:b.id,qty:b.qty,price:b.sale_price,discount:b.discount||0})) });
       if(isUdhaar&&udhaarCustId) {
         await creditApi.addEntry({ customer_id:+udhaarCustId, type:"debit", amount:total, description:`Credit sale - ${billNo}`, sale_id:sale.id }).catch(()=>{});
       }
-      openBill({ billItems, customer:billCustomer, phone:billPhone, billNo, saleDate:sale.sale_date, prevBalance });
+      openBill({ billItems, customer:billCustomer, phone:billPhone, billNo, saleDate:sale.sale_date, prevBalance, paid:isUdhaar?0:total });
       notify(`✅ Sale confirmed! Total: Rs.${grandTotal.toFixed(0)} | Profit: Rs.${profit.toFixed(0)}${isUdhaar?" | Added to credit book":""}`);
       setBillItems([]); setCustomer(""); setPhone(""); setBillNo(genBillNo()); setIsUdhaar(false); setUdhaarCustId(""); setCustSearch(""); setShowCustList(false); load();
     } catch(e) { notify("❌ "+e.message); }
@@ -110,8 +110,8 @@ export default function Billing() {
         <div className="card">
           <h2 className="card-title">🛍️ Add Items to Invoice</h2>
           <div className="row-2">
-            <div><label>Customer Name</label><input value={customer} onChange={e=>setCustomer(e.target.value)} placeholder="Walk-in Customer" /></div>
-            <div><label>Phone No.</label><input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="Optional" /></div>
+            <div><label>Customer Name</label><input value={customer} onChange={e=>setCustomer(e.target.value)} placeholder="Walk-in Customer" autoComplete="off" data-lpignore="true" data-1p-ignore="true" data-form-type="other" name="bill_party_field" /></div>
+            <div><label>Phone No.</label><input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="Optional" autoComplete="off" data-lpignore="true" data-1p-ignore="true" data-form-type="other" name="bill_contact_field" /></div>
           </div>
           <label>Select Item</label>
           <div className="item-search">
@@ -239,7 +239,7 @@ export default function Billing() {
             <button className="btn-success full-width" style={{fontSize:"14px",padding:"13px",letterSpacing:"0.02em"}} onClick={confirmSale} disabled={loading}>
               {loading?"Processing...":isUdhaar?"📒 Confirm Credit Sale & Print Bill":"✅ Confirm Sale & Generate Bill"}
             </button>
-            <button className="btn-outline full-width" style={{marginTop:"6px"}} onClick={()=>{if(billItems.length)openBill({billItems,customer:billCustomer,phone:billPhone,billNo,prevBalance});}}>🖨️ Preview Bill</button>
+            <button className="btn-outline full-width" style={{marginTop:"6px"}} onClick={()=>{if(billItems.length)openBill({billItems,customer:billCustomer,phone:billPhone,billNo,prevBalance,paid:isUdhaar?0:total});}}>🖨️ Preview Bill</button>
             <button className="btn-sm btn-danger" style={{marginTop:"8px",width:"100%",padding:"8px"}} onClick={()=>{if(confirm("Clear all items?"))setBillItems([]);}}>🗑️ Clear Bill</button>
           </>}
         </div>

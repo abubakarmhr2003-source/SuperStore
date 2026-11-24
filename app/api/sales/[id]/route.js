@@ -52,14 +52,16 @@ export async function PUT(req, { params }) {
       if (seen.has(id)) throw new ApiError(400, "Same item added twice");
       seen.add(id);
 
-      let name, sale_price, cost_price;
+      let name, sale_price, cost_price, pieces_per_box = 1;
       const old = oldById.get(id);
       if (old) {
         ({ name, sale_price, cost_price } = old);
+        pieces_per_box = old.pieces_per_box || 1;
       } else {
         const item = await row("SELECT * FROM items WHERE id=$1 AND shop_id=$2", [id, user.shop_id]);
         if (!item) throw new ApiError(400, `Item ${id} not found`);
         ({ name, sale_price, cost_price } = item);
+        pieces_per_box = item.pieces_per_box || 1;
       }
       // Price can be changed while editing a bill.
       if (bi.sale_price !== undefined && bi.sale_price !== null && bi.sale_price !== "" && +bi.sale_price >= 0) sale_price = +bi.sale_price;
@@ -67,7 +69,7 @@ export async function PUT(req, { params }) {
       const gross = sale_price * qty;
       const discount = Math.max(0, Math.min(+bi.discount || 0, gross));
       newItems.push({
-        id, name, qty, sale_price, cost_price, discount,
+        id, name, qty, sale_price, cost_price, discount, pieces_per_box,
         line_total: gross - discount,
       });
     }

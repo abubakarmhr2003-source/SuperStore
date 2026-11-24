@@ -115,7 +115,7 @@ export default function Udhaar() {
           </div>
         )}
         <div className="card" style={{ marginBottom: "1rem", padding: "1rem" }}>
-          <input placeholder="Search by name or phone..." value={search} onChange={e => setSearch(e.target.value)} />
+          <input placeholder="Search by name or phone..." value={search} onChange={e => setSearch(e.target.value)} autoComplete="off" data-lpignore="true" data-1p-ignore="true" data-form-type="other" name="cust_lookup_field" />
         </div>
         {filtered.length === 0 ? (
           <div className="card"><div className="empty"><div style={{ fontSize: "48px", marginBottom: "12px" }}>📒</div>{search ? "No customers found" : "No credit customers yet. Click '+ Add Customer' to start."}</div></div>
@@ -154,13 +154,13 @@ export default function Udhaar() {
         <div className="card" style={{ maxWidth: "480px" }}>
           <h2 className="card-title">Customer Details</h2>
           <label>Full Name *</label>
-          <input value={cForm.name} onChange={e => setCForm({...cForm, name: e.target.value})} placeholder="e.g. Ahmed Khan" autoFocus />
+          <input value={cForm.name} onChange={e => setCForm({...cForm, name: e.target.value})} placeholder="e.g. Ahmed Khan" autoFocus autoComplete="off" data-lpignore="true" data-1p-ignore="true" data-form-type="other" name="cust_title_field" />
           <label>Phone Number</label>
-          <input value={cForm.phone} onChange={e => setCForm({...cForm, phone: e.target.value})} placeholder="03xx-xxxxxxx" />
+          <input value={cForm.phone} onChange={e => setCForm({...cForm, phone: e.target.value})} placeholder="03xx-xxxxxxx" autoComplete="off" data-lpignore="true" data-1p-ignore="true" data-form-type="other" name="cust_contact_field" />
           <label>Address</label>
-          <input value={cForm.address} onChange={e => setCForm({...cForm, address: e.target.value})} placeholder="House / Street (optional)" />
+          <input value={cForm.address} onChange={e => setCForm({...cForm, address: e.target.value})} placeholder="House / Street (optional)" autoComplete="off" data-lpignore="true" data-1p-ignore="true" data-form-type="other" name="cust_place_field" />
           <label>Notes</label>
-          <input value={cForm.notes} onChange={e => setCForm({...cForm, notes: e.target.value})} placeholder="Any notes (optional)" />
+          <input value={cForm.notes} onChange={e => setCForm({...cForm, notes: e.target.value})} placeholder="Any notes (optional)" autoComplete="off" data-lpignore="true" data-1p-ignore="true" data-form-type="other" name="cust_remarks_field" />
           <div style={{ display: "flex", gap: "8px", marginTop: "14px" }}>
             <button className="btn-primary" style={{ flex: 1 }} onClick={handleAddCustomer}>Add Customer</button>
             <button className="btn-outline" onClick={() => setView("list")}>Cancel</button>

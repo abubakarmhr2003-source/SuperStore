@@ -11,6 +11,8 @@
    nothing to block). From there the user can Print / Save as PDF, Share, or
    send it on WhatsApp. It works with tap and mouse alike. */
 
+import { pkDay } from "../../lib/pkTime";
+
 export function esc(v) {
   return String(v ?? "").replace(/[&<>"']/g, (c) => (
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
@@ -77,8 +79,91 @@ export function buildBillHtml({ shop, billNo, date, customer, phone, items, prev
   </body></html>`;
 }
 
+
+const money = (n) => Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+// Cartons = pieces / pieces-per-carton (e.g. 4 pcs of a 40-pc carton = 0.10). Blank if no carton size is set.
+const ctn = (b) => { const per = +b.pieces_per_box; return per > 1 ? (b.qty / per).toFixed(2) : ""; };
+const ddmmyyyy = (d) => pkDay(d).split("-").reverse().join("/");
+
+/* A4 invoice layout (distributor style): shop header, two phone boxes,
+   customer box + invoice box, ruled item table, Amount / Balance / Subtotal /
+   Paid / Amount Due block. Discount is intentionally NOT printed.
+   paid: amount received now. null/undefined = unknown (old bills) -> Paid/Due rows hidden. */
+export function buildInvoiceHtml({ shop, billNo, date, customer, phone, items, prevBalance = 0, paid = null }) {
+  const prev = Math.max(0, Number(prevBalance) || 0);
+  const amount = items.reduce((a, b) => a + billLineAmt(b), 0);
+  const subtotal = amount + prev;
+  const hasPaid = paid !== null && paid !== undefined && !isNaN(+paid);
+  const paidAmt = hasPaid ? Math.max(0, +paid) : 0;
+  const due = Math.max(0, subtotal - paidAmt);
+  // Top boxes: name above number, one box per contact (Settings -> Invoice top box 1 / 2).
+  // If none are filled in, the shop phone field (up to two numbers) is used with no name.
+  let contacts = [
+    { name: shop.contact1_name, phone: shop.contact1_phone },
+    { name: shop.contact2_name, phone: shop.contact2_phone },
+  ].filter(c => (c.name || "").trim() || (c.phone || "").trim());
+  if (!contacts.length) {
+    contacts = String(shop.shop_phone || "").split(/[,/&|\n]+/).map(s => s.trim()).filter(Boolean).slice(0, 2).map(t => ({ name: "", phone: t }));
+  }
+
+  const rows = items.map((b, i) => `<div class="r"><div class="c1">${esc(b.name)}</div><div class="c2">${ctn(b)}</div><div class="c3">${b.qty}</div><div class="c4">${money(billRate(b))}</div><div class="c5">${money(billLineAmt(b))}</div></div>`).join("");
+
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(billNo)}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#000;background:#fff;max-width:210mm;margin:auto;padding:10mm}
+.title{text-align:center;font-size:30px;font-weight:800;letter-spacing:.5px;text-transform:uppercase}
+.addr{text-align:center;font-size:14px;margin:3px 0 10px}
+.two{display:flex;gap:16px;justify-content:space-between;margin-bottom:8px}
+.box{border:1.5px solid #000;padding:8px 12px;flex:1}
+.pbox{text-align:center}.pbox .pn{font-size:18px;font-weight:700;text-transform:uppercase}.pbox .pp{font-size:17px;font-weight:500;margin-top:2px}
+.info{display:flex;gap:16px;margin-bottom:6px}
+.cust{border:1.5px solid #000;padding:8px 12px;flex:1.2;min-height:82px}
+.cust .n{font-size:17px;font-weight:700}
+.inv{border:1.5px solid #000;padding:8px 12px;flex:1;min-height:82px}
+.inv h3{text-align:center;font-size:19px;margin-bottom:6px}
+.inv .l{display:flex;justify-content:space-between;font-size:15px;margin:3px 0}
+.th,.r{display:grid;grid-template-columns:42% 12% 12% 16% 18%}
+.th{background:#7a7a7a;color:#fff;font-weight:600;border:1.5px solid #000;font-size:13px}
+.th div{padding:5px 8px}.th .c2,.th .c3,.th .c4,.th .c5,.r .c2,.r .c3,.r .c4,.r .c5{text-align:right}
+.body{border:1.5px solid #000;border-top:0;min-height:120mm;
+ background:linear-gradient(#000,#000) 42% 0/1px 100% no-repeat,linear-gradient(#000,#000) 54% 0/1px 100% no-repeat,linear-gradient(#000,#000) 66% 0/1px 100% no-repeat,linear-gradient(#000,#000) 82% 0/1px 100% no-repeat}
+.r div{padding:5px 8px;font-size:14px}
+.bottom{display:flex;gap:16px;margin-top:6px;align-items:flex-start}
+.note{flex:1.2;font-size:13px;line-height:1.6}.note b{font-size:20px;display:block;margin-bottom:6px}
+.sum{flex:1}.sum .s{display:flex;justify-content:space-between;border:1.5px solid #000;padding:6px 10px;font-size:15px;margin-bottom:5px}
+.sum .s.big{font-size:17px;font-weight:800;border-width:2.5px}
+.sum .s span:last-child{font-weight:700}
+.foot{text-align:center;font-size:11px;color:#444;margin-top:14px}
+@media print{@page{size:A4;margin:8mm}body{padding:0}.th{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style></head><body>
+<div class="title">${esc(shop.shop_name)}</div>
+<div class="addr">${esc(shop.shop_address || shop.shop_tagline || "")}</div>
+${contacts.length ? `<div class="two">${contacts.map(c => `<div class="box pbox">${c.name ? `<div class="pn">${esc(c.name)}</div>` : ""}${c.phone ? `<div class="pp">${esc(c.phone)}</div>` : ""}</div>`).join("")}</div>` : ""}
+<div class="info">
+  <div class="cust"><div class="n">${esc(customer || "Walk-in Customer")}</div>${phone ? `<div style="margin-top:4px">${esc(phone)}</div>` : ""}</div>
+  <div class="inv"><h3>Invoice</h3>
+    <div class="l"><span>Date:</span><b>${ddmmyyyy(date)}</b></div>
+    <div class="l"><span>Invoice #</span><b>${esc(billNo)}</b></div>
+  </div>
+</div>
+<div class="th"><div class="c1">Item Details</div><div class="c2">Ctn</div><div class="c3">Qty</div><div class="c4">Rate</div><div class="c5">Total Rs</div></div>
+<div class="body">${rows}</div>
+<div class="bottom">
+  <div class="note"><b>NOTE</b>Thanks for choosing ${esc(shop.shop_name)}.<br>Please inform three months before expiry for exchange or return, otherwise we will not accept the product.<br>Thank you.</div>
+  <div class="sum">
+    <div class="s"><span>Amount Rs :</span><span>${money(amount)}</span></div>
+    <div class="s"><span>Balance Rs :</span><span>${money(prev)}</span></div>
+    <div class="s"><span>Subtotal Rs :</span><span>${money(subtotal)}</span></div>
+    ${hasPaid ? `<div class="s"><span>Paid Rs :</span><span>${money(paidAmt)}</span></div><div class="s big"><span>Amount Due Rs</span><span>${money(due)}</span></div>` : `<div class="s big"><span>Total Rs</span><span>${money(subtotal)}</span></div>`}
+  </div>
+</div>
+<div class="foot">${esc(new Date(date).toLocaleString())}</div>
+</body></html>`;
+}
+
 // Plain-text version of the bill, used for Share / WhatsApp.
-export function buildBillText({ shop, billNo, date, customer, items, prevBalance = 0 }) {
+export function buildBillText({ shop, billNo, date, customer, items, prevBalance = 0, paid = null }) {
   const cur = shop.currency_symbol;
   const lineAmt = billLineAmt;
   const prev = Math.max(0, Number(prevBalance) || 0);
@@ -96,6 +181,7 @@ export function buildBillText({ shop, billNo, date, customer, items, prevBalance
     "",
     ...(prev > 0 ? [`Subtotal: ${cur} ${subtotal.toFixed(0)}`, `Previous Balance: ${cur} ${prev.toFixed(0)}`] : []),
     `TOTAL: ${cur} ${total.toFixed(0)}`,
+    ...(paid !== null && paid !== undefined && !isNaN(+paid) ? [`Paid: ${cur} ${(+paid).toFixed(0)}`, `Amount Due: ${cur} ${Math.max(0, total - paid).toFixed(0)}`] : []),
     "",
     "Thank you for your purchase! Please visit again.",
   ].filter((l) => l !== null).join("\n");
@@ -104,7 +190,7 @@ export function buildBillText({ shop, billNo, date, customer, items, prevBalance
 /* Shows `html` in a full-screen in-page overlay with Print / Share / WhatsApp
    / Close buttons. Safe to call from anywhere (even after an await) because
    it never opens a popup. */
-export function openDocument({ html, title = "Document", shareText = "", phone = "" }) {
+export function openDocument({ html, title = "Document", shareText = "", phone = "", variants = null }) {
   // Remove any overlay that is already open.
   document.getElementById("gs-doc-overlay")?.remove();
 
@@ -163,6 +249,18 @@ export function openDocument({ html, title = "Document", shareText = "", phone =
     }, "#25d366");
   }
 
+  // Optional layouts (e.g. A4 Invoice / 80mm Receipt): button switches between them.
+  if (variants && variants.length > 1) {
+    let cur = Math.max(0, variants.findIndex(v => v.html === html));
+    const sw = btn("", () => {
+      cur = (cur + 1) % variants.length;
+      iframe.srcdoc = variants[cur].html;
+      sw.textContent = "🔁 " + variants[(cur + 1) % variants.length].label;
+      try { localStorage.setItem("bill_layout", variants[cur].key); } catch {}
+    }, "#2563eb");
+    sw.textContent = "🔁 " + variants[(cur + 1) % variants.length].label;
+  }
+
   btn("✖ Close", close, "#dc2626");
 
   overlay.appendChild(bar);
@@ -171,13 +269,21 @@ export function openDocument({ html, title = "Document", shareText = "", phone =
 }
 
 // One-call helper used by Billing (new sale / preview) and History (reprint).
-export function showBill({ shop, billNo, date, customer, phone, items, prevBalance = 0 }) {
+// Opens the A4 invoice layout by default; the toolbar can switch to the 80mm receipt
+// (the last choice is remembered).
+export function showBill({ shop, billNo, date, customer, phone, items, prevBalance = 0, paid = null }) {
   const d = date ? new Date(date) : new Date();
-  const args = { shop, billNo, date: d, customer, phone, items, prevBalance };
+  const args = { shop, billNo, date: d, customer, phone, items, prevBalance, paid };
+  const invoice = { key: "invoice", label: "Receipt 80mm", html: buildInvoiceHtml(args) };
+  const receipt = { key: "receipt", label: "Invoice A4", html: buildBillHtml(args) };
+  let pref = "invoice";
+  try { pref = localStorage.getItem("bill_layout") || "invoice"; } catch {}
+  const variants = pref === "receipt" ? [receipt, invoice] : [invoice, receipt];
   openDocument({
-    html: buildBillHtml(args),
+    html: variants[0].html,
     title: `Bill ${billNo}`,
     shareText: buildBillText(args),
     phone,
+    variants,
   });
 }

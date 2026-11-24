@@ -20,6 +20,10 @@ export function getShopInfo() {
       shop_phone:   parsed.shop_phone || "",
       shop_address: parsed.shop_address || "",
       currency_symbol: parsed.currency_symbol?.trim() || DEFAULTS.currency_symbol,
+      contact1_name: parsed.contact1_name || "",
+      contact1_phone: parsed.contact1_phone || "",
+      contact2_name: parsed.contact2_name || "",
+      contact2_phone: parsed.contact2_phone || "",
       slug: parsed.slug || "",
     };
   } catch {

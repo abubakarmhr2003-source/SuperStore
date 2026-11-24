@@ -33,6 +33,10 @@ export default function Settings({ onUpdated }) {
         shop_address: form.shop_address,
         currency_symbol: form.currency_symbol,
         notify_email: form.notify_email,
+        contact1_name: form.contact1_name,
+        contact1_phone: form.contact1_phone,
+        contact2_name: form.contact2_name,
+        contact2_phone: form.contact2_phone,
       });
       setShopInfo(updated);
       setForm(updated);
@@ -88,6 +92,12 @@ export default function Settings({ onUpdated }) {
             onChange={e => setForm({ ...form, shop_address: e.target.value })}
             placeholder="e.g. Main Bazaar, Lahore"
           />
+          <label>Invoice top box 1 — Name &amp; Number <small style={{opacity:.7}}>optional</small></label>
+          <input value={form.contact1_name || ""} onChange={e => setForm({ ...form, contact1_name: e.target.value })} placeholder="Name, e.g. Sheikh Salman" autoComplete="off" />
+          <input value={form.contact1_phone || ""} onChange={e => setForm({ ...form, contact1_phone: e.target.value })} placeholder="Number, e.g. 0300-6465096" autoComplete="off" />
+          <label>Invoice top box 2 — Name &amp; Number <small style={{opacity:.7}}>optional</small></label>
+          <input value={form.contact2_name || ""} onChange={e => setForm({ ...form, contact2_name: e.target.value })} placeholder="Name, e.g. Sheikh Sohail" autoComplete="off" />
+          <input value={form.contact2_phone || ""} onChange={e => setForm({ ...form, contact2_phone: e.target.value })} placeholder="Number, e.g. 0302-8229096" autoComplete="off" />
           <label>Currency Symbol</label>
           <select value={form.currency_symbol} onChange={e => setForm({ ...form, currency_symbol: e.target.value })}>
             {CURRENCY_OPTIONS.map(c => <option key={c.symbol} value={c.symbol}>{c.label}</option>)}
