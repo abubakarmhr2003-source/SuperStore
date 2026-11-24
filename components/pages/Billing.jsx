@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, creditApi } from "../utils/api";
 import { getShopInfo } from "../utils/shopInfo";
-import { showBill, billRate } from "../utils/printDoc";
+import { showBill, billRate, buildInvoiceHtml } from "../utils/printDoc";
+import InvoicePreview from "../utils/InvoicePreview";
 
 // Opens the bill in an in-page overlay (works on mobile — no popup needed).
 function openBill({ billItems, customer, phone, billNo, saleDate, prevBalance, paid }) {
@@ -248,29 +249,10 @@ export default function Billing() {
           <h2 className="card-title">🧾 Live Invoice Preview</h2>
           {billItems.length===0
             ?<div className="empty"><div style={{fontSize:"48px",marginBottom:"12px"}}>🧾</div>Add items to see preview</div>
-            :<div className="receipt">
-              <div className="receipt-header">
-                <div className="receipt-shop">🏪 {shopBrand.shop_name.toUpperCase()}</div>
-                <div className="receipt-meta" style={{fontSize:"10px",marginBottom:"8px"}}>{shopBrand.shop_tagline}</div>
-                <div style={{borderTop:"2px solid var(--border2)",margin:"8px 0"}}/>
-                {[["Invoice",billNo],["Date",new Date().toLocaleDateString()],["Customer",billCustomer],...(billPhone?[["Phone",billPhone]]:[])].map(([l,v])=>(
-                  <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:"11px",marginBottom:"2px"}}>
-                    <span style={{color:"var(--text2)"}}>{l}:</span><strong>{v}</strong>
-                  </div>
-                ))}
-              </div>
-              <div className="receipt-divider"/>
-              <table className="receipt-table">
-                <thead><tr><th style={{width:"38%"}}>Item</th><th style={{textAlign:"center"}}>Qty</th><th style={{textAlign:"right"}}>Rate</th><th style={{textAlign:"right"}}>Amt</th></tr></thead>
-                <tbody>{billItems.map(b=><tr key={b.id}><td>{b.name}</td><td style={{textAlign:"center"}}>{b.qty}</td><td style={{textAlign:"right"}}>{shopBrand.currency_symbol}{billRate(b)}</td><td style={{textAlign:"right"}}><strong>{shopBrand.currency_symbol}{(b.qty*b.sale_price-(b.discount||0)).toFixed(0)}</strong></td></tr>)}</tbody>
-              </table>
-              <div className="receipt-divider"/>
-              {prevBalance>0 && <div style={{display:"flex",justifyContent:"space-between",fontSize:"11px",color:"var(--text2)",marginBottom:"2px"}}><span>Subtotal</span><span>{shopBrand.currency_symbol} {total.toFixed(0)}</span></div>}
-              {prevBalance>0 && <div style={{display:"flex",justifyContent:"space-between",fontSize:"11px",color:"var(--text2)",marginBottom:"6px"}}><span>Previous Balance</span><span>{shopBrand.currency_symbol} {prevBalance.toFixed(0)}</span></div>}
-              <div className="receipt-total"><span>TOTAL</span><span>{shopBrand.currency_symbol} {grandTotal.toFixed(0)}</span></div>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:"11px",color:"var(--green)",marginTop:"4px",fontStyle:"italic"}}><span>(Profit — not printed)</span><span>{shopBrand.currency_symbol} {profit.toFixed(0)}</span></div>
-              <div className="receipt-footer">★ Thank you for your purchase! ★<br/><span style={{fontSize:"10px"}}>Please visit again</span></div>
-            </div>}
+            :<>
+              <InvoicePreview html={buildInvoiceHtml({ shop:shopBrand, billNo, date:new Date(), customer:billCustomer, phone:billPhone, items:billItems, prevBalance, paid:isUdhaar?0:total })} />
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:"11px",color:"var(--green)",marginTop:"8px",fontStyle:"italic"}}><span>(Profit — not printed)</span><span>{shopBrand.currency_symbol} {profit.toFixed(0)}</span></div>
+            </>}
         </div>
       </div>
     </div>

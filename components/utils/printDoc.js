@@ -9,7 +9,7 @@
 
    Now the bill opens in a full-screen overlay INSIDE the page (no popup, so
    nothing to block). From there the user can Print / Save as PDF, Share, or
-   send it on WhatsApp. It works with tap and mouse alike. */
+   share it. It works with tap and mouse alike. */
 
 import { pkDay } from "../../lib/pkTime";
 
@@ -153,7 +153,7 @@ ${contacts.length ? `<div class="two">${contacts.map(c => `<div class="box pbox"
   <div class="note"><b>NOTE</b>Thanks for choosing ${esc(shop.shop_name)}.<br>Please inform three months before expiry for exchange or return, otherwise we will not accept the product.<br>Thank you.</div>
   <div class="sum">
     <div class="s"><span>Amount Rs :</span><span>${money(amount)}</span></div>
-    <div class="s"><span>Balance Rs :</span><span>${money(prev)}</span></div>
+    <div class="s"><span>Previous Balance Rs :</span><span>${money(prev)}</span></div>
     <div class="s"><span>Subtotal Rs :</span><span>${money(subtotal)}</span></div>
     ${hasPaid ? `<div class="s"><span>Paid Rs :</span><span>${money(paidAmt)}</span></div><div class="s big"><span>Amount Due Rs</span><span>${money(due)}</span></div>` : `<div class="s big"><span>Total Rs</span><span>${money(subtotal)}</span></div>`}
   </div>
@@ -187,7 +187,7 @@ export function buildBillText({ shop, billNo, date, customer, items, prevBalance
   ].filter((l) => l !== null).join("\n");
 }
 
-/* Shows `html` in a full-screen in-page overlay with Print / Share / WhatsApp
+/* Shows `html` in a full-screen in-page overlay with Print / Share
    / Close buttons. Safe to call from anywhere (even after an await) because
    it never opens a popup. */
 export function openDocument({ html, title = "Document", shareText = "", phone = "", variants = null }) {
@@ -242,11 +242,6 @@ export function openDocument({ html, title = "Document", shareText = "", phone =
         navigator.share({ title, text: shareText }).catch(() => {}); // user cancelled = fine
       });
     }
-    btn("💬 WhatsApp", () => {
-      const n = waNumber(phone);
-      const url = `https://wa.me/${n}?text=${encodeURIComponent(shareText)}`;
-      window.open(url, "_blank", "noopener");
-    }, "#25d366");
   }
 
   // Optional layouts (e.g. A4 Invoice / 80mm Receipt): button switches between them.

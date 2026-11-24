@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { settingsApi } from "../utils/api";
 import { setShopInfo } from "../utils/shopInfo";
+import { buildInvoiceHtml } from "../utils/printDoc";
+import InvoicePreview from "../utils/InvoicePreview";
 
 const CURRENCY_OPTIONS = [
   { symbol: "Rs.", label: "Rs. — Pakistani Rupee" },
@@ -120,27 +122,19 @@ export default function Settings({ onUpdated }) {
 
         <div className="card">
           <h2 className="card-title">👁️ Bill Preview</h2>
-          <div className="receipt">
-            <div className="receipt-header">
-              <div className="receipt-shop">🏪 {form.shop_name?.toUpperCase() || "YOUR SHOP NAME"}</div>
-              <div className="receipt-meta" style={{ marginTop: "4px", marginBottom: "8px" }}>{form.shop_tagline}</div>
-              {form.shop_phone && <div className="receipt-meta">📞 {form.shop_phone}</div>}
-              {form.shop_address && <div className="receipt-meta">📍 {form.shop_address}</div>}
-            </div>
-            <div className="receipt-divider" />
-            <table className="receipt-table">
-              <thead><tr><th>Item</th><th style={{textAlign:"center"}}>Qty</th><th style={{textAlign:"right"}}>Rate</th><th style={{textAlign:"right"}}>Amt</th></tr></thead>
-              <tbody>
-                <tr><td>Sample Item</td><td style={{textAlign:"center"}}>2</td><td style={{textAlign:"right"}}>{form.currency_symbol}50</td><td style={{textAlign:"right"}}>{form.currency_symbol}100</td></tr>
-              </tbody>
-            </table>
-            <div className="receipt-divider" />
-            <div className="receipt-total">
-              <span>TOTAL</span>
-              <span>{form.currency_symbol} 100</span>
-            </div>
-            <div className="receipt-footer">★ Thank you for your purchase! ★<br />Please visit again</div>
-          </div>
+          <InvoicePreview html={buildInvoiceHtml({
+            shop: { ...form, shop_name: form.shop_name || "Your Shop Name" },
+            billNo: "1001",
+            date: new Date(),
+            customer: "Sample Customer",
+            phone: "",
+            items: [
+              { name: "Sample Item A", qty: 4, sale_price: 380, line_total: 1520, pieces_per_box: 40 },
+              { name: "Sample Item B", qty: 2, sale_price: 430, line_total: 860, pieces_per_box: 1 },
+            ],
+            prevBalance: 0,
+            paid: 0,
+          })} />
 
           <div className="calc-box" style={{ marginTop: "1rem" }}>
             This is how your shop info will appear on printed bills, credit statements, and exported reports.
