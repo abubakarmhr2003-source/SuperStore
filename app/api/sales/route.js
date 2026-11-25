@@ -21,7 +21,7 @@ export async function POST(req) {
     const customer = data.customer || "Walk-in Customer";
     const items = data.items || [];
     const prevBalance = Math.max(0, Number(data.prev_balance) || 0);
-    const paidNow = data.paid === undefined || data.paid === null || data.paid === "" || !(+data.paid >= 0) ? null : +data.paid;   // display only
+    const custAddress = String(data.customer_address || "").trim().slice(0, 200);
 
     const saleItems = [];
     let total = 0;
@@ -47,7 +47,6 @@ export async function POST(req) {
         id: item.id, name: item.name, qty: bi.qty,
         sale_price: price, cost_price: item.cost_price,
         discount: disc, line_total: lt,
-        pieces_per_box: item.pieces_per_box || 1,   // for the Ctn column on the invoice
       });
 
       await query(
@@ -57,8 +56,8 @@ export async function POST(req) {
     }
 
     const sale = await row(
-      "INSERT INTO sales (shop_id,customer,items_json,total,profit,sold_by,prev_balance,paid) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *",
-      [user.shop_id, customer, JSON.stringify(saleItems), total, profit, user.username, prevBalance, paidNow]
+      "INSERT INTO sales (shop_id,customer,items_json,total,profit,sold_by,prev_balance,customer_address) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *",
+      [user.shop_id, customer, JSON.stringify(saleItems), total, profit, user.username, prevBalance, custAddress]
     );
     return NextResponse.json({ ...sale, items_json: JSON.parse(sale.items_json) });
   });

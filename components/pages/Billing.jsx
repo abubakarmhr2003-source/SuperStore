@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { api, creditApi } from "../utils/api";
 import { getShopInfo } from "../utils/shopInfo";
-import { showBill, billRate, buildInvoiceHtml } from "../utils/printDoc";
-import InvoicePreview from "../utils/InvoicePreview";
+import { showBill, billRate, developerLine } from "../utils/printDoc";
 
 // Opens the bill in an in-page overlay (works on mobile — no popup needed).
-function openBill({ billItems, customer, phone, billNo, saleDate, prevBalance, paid }) {
-  showBill({ shop: getShopInfo(), billNo, date: saleDate, customer, phone, items: billItems, prevBalance, paid });
+function openBill({ billItems, customer, phone, address, billNo, saleDate, prevBalance }) {
+  showBill({ shop: getShopInfo(), billNo, date: saleDate, customer, phone, address, items: billItems, prevBalance });
 }
 
 function genBillNo() {
@@ -19,6 +18,7 @@ export default function Billing() {
   const [billItems, setBillItems] = useState([]);
   const [customer, setCustomer] = useState("");
   const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
   const [selItem, setSelItem] = useState("");
   const [search, setSearch] = useState("");
   const [showList, setShowList] = useState(false);
@@ -50,7 +50,7 @@ export default function Billing() {
     const already = existing?existing.qty:0;
     if(already+n>item.qty) return notify(`❌ Only ${item.qty-already} piece(s) available`);
     if(existing) setBillItems(billItems.map(b=>b.id===item.id?{...b,qty:b.qty+n}:b));
-    else setBillItems([...billItems,{id:item.id,name:item.name,sale_price:item.sale_price,cost_price:item.cost_price,pieces_per_box:item.pieces_per_box||1,qty:n,discount:0}]);
+    else setBillItems([...billItems,{id:item.id,name:item.name,sale_price:item.sale_price,cost_price:item.cost_price,qty:n,discount:0}]);
     setSelItem(""); setSearch(""); setShowList(false); setQty("");
   };
 
@@ -83,6 +83,7 @@ export default function Billing() {
   const grandTotal  = total + prevBalance;
   const billCustomer = customer.trim() || udhaarCust?.name || "Walk-in Customer";
   const billPhone    = phone.trim() || udhaarCust?.phone || "";
+  const billAddress  = address.trim() || udhaarCust?.address || "";
   const profit = billItems.reduce((a,b)=>a+(b.cost_price>0?(b.sale_price-b.cost_price)*b.qty-(b.discount||0):0),0);   // no purchase price = profit not counted
 
   const confirmSale = async () => {
@@ -92,13 +93,13 @@ export default function Billing() {
     if(isUdhaar&&!udhaarCustId) return notify("❌ Please select a credit customer");
     setLoading(true);
     try {
-      const sale = await api.createSale({ customer:billCustomer, prev_balance:prevBalance, paid:isUdhaar?0:total, items:billItems.map(b=>({item_id:b.id,qty:b.qty,price:b.sale_price,discount:b.discount||0})) });
+      const sale = await api.createSale({ customer:billCustomer, customer_address:billAddress, prev_balance:prevBalance, items:billItems.map(b=>({item_id:b.id,qty:b.qty,price:b.sale_price,discount:b.discount||0})) });
       if(isUdhaar&&udhaarCustId) {
         await creditApi.addEntry({ customer_id:+udhaarCustId, type:"debit", amount:total, description:`Credit sale - ${billNo}`, sale_id:sale.id }).catch(()=>{});
       }
-      openBill({ billItems, customer:billCustomer, phone:billPhone, billNo, saleDate:sale.sale_date, prevBalance, paid:isUdhaar?0:total });
+      openBill({ billItems, customer:billCustomer, phone:billPhone, address:billAddress, billNo, saleDate:sale.sale_date, prevBalance });
       notify(`✅ Sale confirmed! Total: Rs.${grandTotal.toFixed(0)} | Profit: Rs.${profit.toFixed(0)}${isUdhaar?" | Added to credit book":""}`);
-      setBillItems([]); setCustomer(""); setPhone(""); setBillNo(genBillNo()); setIsUdhaar(false); setUdhaarCustId(""); setCustSearch(""); setShowCustList(false); load();
+      setBillItems([]); setCustomer(""); setPhone(""); setAddress(""); setBillNo(genBillNo()); setIsUdhaar(false); setUdhaarCustId(""); setCustSearch(""); setShowCustList(false); load();
     } catch(e) { notify("❌ "+e.message); }
     finally { setLoading(false); }
   };
@@ -114,6 +115,8 @@ export default function Billing() {
             <div><label>Customer Name</label><input value={customer} onChange={e=>setCustomer(e.target.value)} placeholder="Walk-in Customer" autoComplete="off" data-lpignore="true" data-1p-ignore="true" data-form-type="other" name="bill_party_field" /></div>
             <div><label>Phone No.</label><input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="Optional" autoComplete="off" data-lpignore="true" data-1p-ignore="true" data-form-type="other" name="bill_contact_field" /></div>
           </div>
+          <label>Customer Address</label>
+          <input value={address} onChange={e=>setAddress(e.target.value)} placeholder={udhaarCust?.address || "Optional"} autoComplete="off" data-lpignore="true" data-1p-ignore="true" data-form-type="other" name="bill_place_field" />
           <label>Select Item</label>
           <div className="item-search">
             <input
@@ -240,7 +243,7 @@ export default function Billing() {
             <button className="btn-success full-width" style={{fontSize:"14px",padding:"13px",letterSpacing:"0.02em"}} onClick={confirmSale} disabled={loading}>
               {loading?"Processing...":isUdhaar?"📒 Confirm Credit Sale & Print Bill":"✅ Confirm Sale & Generate Bill"}
             </button>
-            <button className="btn-outline full-width" style={{marginTop:"6px"}} onClick={()=>{if(billItems.length)openBill({billItems,customer:billCustomer,phone:billPhone,billNo,prevBalance,paid:isUdhaar?0:total});}}>🖨️ Preview Bill</button>
+            <button className="btn-outline full-width" style={{marginTop:"6px"}} onClick={()=>{if(billItems.length)openBill({billItems,customer:billCustomer,phone:billPhone,address:billAddress,billNo,prevBalance});}}>🖨️ Preview Bill</button>
             <button className="btn-sm btn-danger" style={{marginTop:"8px",width:"100%",padding:"8px"}} onClick={()=>{if(confirm("Clear all items?"))setBillItems([]);}}>🗑️ Clear Bill</button>
           </>}
         </div>
@@ -249,10 +252,30 @@ export default function Billing() {
           <h2 className="card-title">🧾 Live Invoice Preview</h2>
           {billItems.length===0
             ?<div className="empty"><div style={{fontSize:"48px",marginBottom:"12px"}}>🧾</div>Add items to see preview</div>
-            :<>
-              <InvoicePreview html={buildInvoiceHtml({ shop:shopBrand, billNo, date:new Date(), customer:billCustomer, phone:billPhone, items:billItems, prevBalance, paid:isUdhaar?0:total })} />
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:"11px",color:"var(--green)",marginTop:"8px",fontStyle:"italic"}}><span>(Profit — not printed)</span><span>{shopBrand.currency_symbol} {profit.toFixed(0)}</span></div>
-            </>}
+            :<div className="receipt">
+              <div className="receipt-header">
+                <div className="receipt-shop">🏪 {shopBrand.shop_name.toUpperCase()}</div>
+                <div className="receipt-meta" style={{fontSize:"10px",marginBottom:"8px"}}>{shopBrand.shop_tagline}</div>
+                <div style={{borderTop:"2px solid var(--border2)",margin:"8px 0"}}/>
+                {[["Customer",billCustomer],...(billPhone?[["Phone",billPhone]]:[]),...(billAddress?[["Address",billAddress]]:[])].map(([l,v])=>(
+                  <div key={l} style={{display:"flex",justifyContent:"space-between",fontSize:"11px",marginBottom:"2px"}}>
+                    <span style={{color:"var(--text2)"}}>{l}:</span><strong>{v}</strong>
+                  </div>
+                ))}
+              </div>
+              <div className="receipt-divider"/>
+              <table className="receipt-table">
+                <thead><tr><th style={{width:"38%"}}>Item</th><th style={{textAlign:"center"}}>Qty</th><th style={{textAlign:"right"}}>Rate</th><th style={{textAlign:"right"}}>Amt</th></tr></thead>
+                <tbody>{billItems.map(b=><tr key={b.id}><td>{b.name}</td><td style={{textAlign:"center"}}>{b.qty}</td><td style={{textAlign:"right"}}>{shopBrand.currency_symbol}{billRate(b)}</td><td style={{textAlign:"right"}}><strong>{shopBrand.currency_symbol}{(b.qty*b.sale_price-(b.discount||0)).toFixed(0)}</strong></td></tr>)}</tbody>
+              </table>
+              <div className="receipt-divider"/>
+              {prevBalance>0 && <div style={{display:"flex",justifyContent:"space-between",fontSize:"11px",color:"var(--text2)",marginBottom:"2px"}}><span>Subtotal</span><span>{shopBrand.currency_symbol} {total.toFixed(0)}</span></div>}
+              {prevBalance>0 && <div style={{display:"flex",justifyContent:"space-between",fontSize:"11px",color:"var(--text2)",marginBottom:"6px"}}><span>Previous Balance</span><span>{shopBrand.currency_symbol} {prevBalance.toFixed(0)}</span></div>}
+              <div className="receipt-total"><span>TOTAL</span><span>{shopBrand.currency_symbol} {grandTotal.toFixed(0)}</span></div>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:"11px",color:"var(--green)",marginTop:"4px",fontStyle:"italic"}}><span>(Profit — not printed)</span><span>{shopBrand.currency_symbol} {profit.toFixed(0)}</span></div>
+              <div className="receipt-footer"><span dir="rtl" lang="ur" style={{fontSize:"15px",fontWeight:700,fontFamily:"'Jameel Noori Nastaleeq','Noto Nastaliq Urdu','Urdu Typesetting','Noto Naskh Arabic','Segoe UI',Tahoma,Arial,sans-serif"}}>آپ کی محبتوں کا شکریہ</span><br/><span style={{fontSize:"10px"}}>Please visit again</span></div>
+              <div style={{textAlign:"center",fontSize:"10px",fontWeight:700,marginTop:"8px",paddingTop:"6px",borderTop:"1px dashed var(--border2)"}}>{developerLine()}</div>
+            </div>}
         </div>
       </div>
     </div>

@@ -22,9 +22,6 @@ export async function PUT(req, { params }) {
     if (data.qty !== undefined && data.qty !== null) {
       fields.push(`qty=$${i++}`); vals.push(data.qty);
     }
-    if (data.pieces_per_box !== undefined && data.pieces_per_box !== null && data.pieces_per_box !== "" && +data.pieces_per_box >= 1) {
-      fields.push(`pieces_per_box=$${i++}`); vals.push(Math.floor(+data.pieces_per_box));
-    }
     if (data.low_stock_limit !== undefined && data.low_stock_limit !== null && data.low_stock_limit !== "" && +data.low_stock_limit >= 0) {
       fields.push(`low_stock_limit=$${i++}`); vals.push(Math.floor(+data.low_stock_limit));
     }

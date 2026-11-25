@@ -26,7 +26,7 @@ export default function Stock() {
     await api.deleteItem(id); load(); notify(`🗑️ ${name} removed`);
   };
   const saveEdit = async id => {
-    try { await api.updateItem(id, { cost_price:+editData.cost_price, sale_price:+editData.sale_price, qty:+editData.qty, pieces_per_box:+editData.pieces_per_box||1, low_stock_limit:+editData.low_stock_limit }); setEditId(null); load(); notify("✅ Updated!"); }
+    try { await api.updateItem(id, { cost_price:+editData.cost_price, sale_price:+editData.sale_price, qty:+editData.qty, low_stock_limit:+editData.low_stock_limit }); setEditId(null); load(); notify("✅ Updated!"); }
     catch(e) { notify("❌ "+e.message); }
   };
   const filtered = items.filter(i => i.name.toLowerCase().includes(search.toLowerCase()) || i.category.toLowerCase().includes(search.toLowerCase()));
@@ -93,15 +93,14 @@ export default function Stock() {
         <h2 className="card-title">📦 All Stock</h2>
         <div className="table-wrap">
           <table className="main-table">
-            <thead><tr><th>Item</th><th>Category</th><th>Stock</th><th>Pcs / Ctn</th><th>Alert At</th><th>Cost</th><th>Sale Price</th><th>Profit</th><th>Value</th><th>Status</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Item</th><th>Category</th><th>Stock</th><th>Alert At</th><th>Cost</th><th>Sale Price</th><th>Profit</th><th>Value</th><th>Status</th><th>Actions</th></tr></thead>
             <tbody>
-              {filtered.length===0&&<tr><td colSpan={11} className="empty">No items found</td></tr>}
+              {filtered.length===0&&<tr><td colSpan={10} className="empty">No items found</td></tr>}
               {filtered.map(item=>(
                 <tr key={item.id}>
                   <td className="bold">{item.name}</td>
                   <td className="muted">{item.category}</td>
                   <td>{editId===item.id?<input type="number" value={editData.qty} onChange={e=>setEditData({...editData,qty:e.target.value})} style={{width:"70px"}} />:`${item.qty} pcs`}</td>
-                  <td>{editId===item.id?<input type="number" min="1" value={editData.pieces_per_box} onChange={e=>setEditData({...editData,pieces_per_box:e.target.value})} style={{width:"70px"}} />:(item.pieces_per_box>1?`${item.pieces_per_box} pcs`:"—")}</td>
                   <td>{editId===item.id?<input type="number" min="0" value={editData.low_stock_limit} onChange={e=>setEditData({...editData,low_stock_limit:e.target.value})} style={{width:"70px"}} />:`${limitOf(item)} pcs`}</td>
                   <td>{editId===item.id?<input type="number" value={editData.cost_price} onChange={e=>setEditData({...editData,cost_price:e.target.value})} style={{width:"80px"}} />:(item.cost_price>0?`Rs. ${item.cost_price}`:"—")}</td>
                   <td>{editId===item.id?<input type="number" value={editData.sale_price} onChange={e=>setEditData({...editData,sale_price:e.target.value})} style={{width:"80px"}} />:(item.sale_price>0?`Rs. ${item.sale_price}`:"—")}</td>
@@ -110,7 +109,7 @@ export default function Stock() {
                   <td><span className={`badge ${item.qty===0?"red":item.qty<=limitOf(item)?"orange":"green"}`}>{item.qty===0?"Out":item.qty<=limitOf(item)?"Low":"OK"}</span></td>
                   <td>{editId===item.id
                     ?<><button className="btn-sm btn-success" onClick={()=>saveEdit(item.id)}>Save</button><button className="btn-sm" onClick={()=>setEditId(null)}>Cancel</button></>
-                    :<><button className="btn-sm btn-edit" onClick={()=>{setEditId(item.id);setEditData({cost_price:item.cost_price,sale_price:item.sale_price,qty:item.qty,pieces_per_box:item.pieces_per_box||1,low_stock_limit:limitOf(item)})}}>Edit</button><button className="btn-sm btn-danger" onClick={()=>handleDelete(item.id,item.name)}>Delete</button></>}
+                    :<><button className="btn-sm btn-edit" onClick={()=>{setEditId(item.id);setEditData({cost_price:item.cost_price,sale_price:item.sale_price,qty:item.qty,low_stock_limit:limitOf(item)})}}>Edit</button><button className="btn-sm btn-danger" onClick={()=>handleDelete(item.id,item.name)}>Delete</button></>}
                   </td>
                 </tr>
               ))}

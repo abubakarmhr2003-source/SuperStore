@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { settingsApi } from "../utils/api";
 import { setShopInfo } from "../utils/shopInfo";
-import { buildInvoiceHtml } from "../utils/printDoc";
-import InvoicePreview from "../utils/InvoicePreview";
 
 const CURRENCY_OPTIONS = [
   { symbol: "Rs.", label: "Rs. — Pakistani Rupee" },
@@ -35,10 +33,6 @@ export default function Settings({ onUpdated }) {
         shop_address: form.shop_address,
         currency_symbol: form.currency_symbol,
         notify_email: form.notify_email,
-        contact1_name: form.contact1_name,
-        contact1_phone: form.contact1_phone,
-        contact2_name: form.contact2_name,
-        contact2_phone: form.contact2_phone,
       });
       setShopInfo(updated);
       setForm(updated);
@@ -94,12 +88,6 @@ export default function Settings({ onUpdated }) {
             onChange={e => setForm({ ...form, shop_address: e.target.value })}
             placeholder="e.g. Main Bazaar, Lahore"
           />
-          <label>Invoice top box 1 — Name &amp; Number <small style={{opacity:.7}}>optional</small></label>
-          <input value={form.contact1_name || ""} onChange={e => setForm({ ...form, contact1_name: e.target.value })} placeholder="Name, e.g. Sheikh Salman" autoComplete="off" />
-          <input value={form.contact1_phone || ""} onChange={e => setForm({ ...form, contact1_phone: e.target.value })} placeholder="Number, e.g. 0300-6465096" autoComplete="off" />
-          <label>Invoice top box 2 — Name &amp; Number <small style={{opacity:.7}}>optional</small></label>
-          <input value={form.contact2_name || ""} onChange={e => setForm({ ...form, contact2_name: e.target.value })} placeholder="Name, e.g. Sheikh Sohail" autoComplete="off" />
-          <input value={form.contact2_phone || ""} onChange={e => setForm({ ...form, contact2_phone: e.target.value })} placeholder="Number, e.g. 0302-8229096" autoComplete="off" />
           <label>Currency Symbol</label>
           <select value={form.currency_symbol} onChange={e => setForm({ ...form, currency_symbol: e.target.value })}>
             {CURRENCY_OPTIONS.map(c => <option key={c.symbol} value={c.symbol}>{c.label}</option>)}
@@ -122,19 +110,27 @@ export default function Settings({ onUpdated }) {
 
         <div className="card">
           <h2 className="card-title">👁️ Bill Preview</h2>
-          <InvoicePreview html={buildInvoiceHtml({
-            shop: { ...form, shop_name: form.shop_name || "Your Shop Name" },
-            billNo: "1001",
-            date: new Date(),
-            customer: "Sample Customer",
-            phone: "",
-            items: [
-              { name: "Sample Item A", qty: 4, sale_price: 380, line_total: 1520, pieces_per_box: 40 },
-              { name: "Sample Item B", qty: 2, sale_price: 430, line_total: 860, pieces_per_box: 1 },
-            ],
-            prevBalance: 0,
-            paid: 0,
-          })} />
+          <div className="receipt">
+            <div className="receipt-header">
+              <div className="receipt-shop">🏪 {form.shop_name?.toUpperCase() || "YOUR SHOP NAME"}</div>
+              <div className="receipt-meta" style={{ marginTop: "4px", marginBottom: "8px" }}>{form.shop_tagline}</div>
+              {form.shop_phone && <div className="receipt-meta">📞 {form.shop_phone}</div>}
+              {form.shop_address && <div className="receipt-meta">📍 {form.shop_address}</div>}
+            </div>
+            <div className="receipt-divider" />
+            <table className="receipt-table">
+              <thead><tr><th>Item</th><th style={{textAlign:"center"}}>Qty</th><th style={{textAlign:"right"}}>Rate</th><th style={{textAlign:"right"}}>Amt</th></tr></thead>
+              <tbody>
+                <tr><td>Sample Item</td><td style={{textAlign:"center"}}>2</td><td style={{textAlign:"right"}}>{form.currency_symbol}50</td><td style={{textAlign:"right"}}>{form.currency_symbol}100</td></tr>
+              </tbody>
+            </table>
+            <div className="receipt-divider" />
+            <div className="receipt-total">
+              <span>TOTAL</span>
+              <span>{form.currency_symbol} 100</span>
+            </div>
+            <div className="receipt-footer"><span dir="rtl" lang="ur" style={{fontSize:"15px",fontWeight:700,fontFamily:"'Jameel Noori Nastaleeq','Noto Nastaliq Urdu','Urdu Typesetting','Noto Naskh Arabic','Segoe UI',Tahoma,Arial,sans-serif"}}>آپ کی محبتوں کا شکریہ</span><br />Please visit again</div>
+          </div>
 
           <div className="calc-box" style={{ marginTop: "1rem" }}>
             This is how your shop info will appear on printed bills, credit statements, and exported reports.

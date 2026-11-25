@@ -10,10 +10,6 @@ const DEFAULTS = {
   shop_address: "",
   currency_symbol: "Rs.",
   notify_email: "",
-  contact1_name: "",
-  contact1_phone: "",
-  contact2_name: "",
-  contact2_phone: "",
   setup_complete: "0",
   slug: "",
 };
@@ -36,10 +32,6 @@ export async function GET(req) {
       shop_address: shop.shop_address || "",
       currency_symbol: shop.currency_symbol || DEFAULTS.currency_symbol,
       notify_email: shop.notify_email || "",
-      contact1_name: shop.contact1_name || "",
-      contact1_phone: shop.contact1_phone || "",
-      contact2_name: shop.contact2_name || "",
-      contact2_phone: shop.contact2_phone || "",
       setup_complete: String(shop.setup_complete ?? "0"),
       slug: shop.slug,
     });
@@ -55,7 +47,7 @@ export async function PUT(req) {
     const fields = [];
     const vals = [];
     let i = 1;
-    for (const k of ["shop_name", "shop_tagline", "shop_phone", "shop_address", "currency_symbol", "notify_email", "contact1_name", "contact1_phone", "contact2_name", "contact2_phone"]) {
+    for (const k of ["shop_name", "shop_tagline", "shop_phone", "shop_address", "currency_symbol", "notify_email"]) {
       if (data[k] !== undefined && data[k] !== null) {
         fields.push(`${k}=$${i++}`);
         vals.push(String(data[k]));
@@ -78,10 +70,6 @@ export async function PUT(req) {
       shop_address: shop.shop_address || "",
       currency_symbol: shop.currency_symbol || DEFAULTS.currency_symbol,
       notify_email: shop.notify_email || "",
-      contact1_name: shop.contact1_name || "",
-      contact1_phone: shop.contact1_phone || "",
-      contact2_name: shop.contact2_name || "",
-      contact2_phone: shop.contact2_phone || "",
       setup_complete: String(shop.setup_complete ?? "0"),
       slug: shop.slug,
     });

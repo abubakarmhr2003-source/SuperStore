@@ -12,7 +12,7 @@ function openBill(s) {
     customer: s.customer,
     items: s.items_json,
     prevBalance: s.prev_balance || 0,
-    paid: s.paid ?? null,
+    address: s.customer_address || "",
   });
 }
 const MONTHS = ["january","february","march","april","may","june","july","august","september","october","november","december"];

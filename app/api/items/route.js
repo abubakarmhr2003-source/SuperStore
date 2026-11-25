@@ -20,7 +20,7 @@ export async function POST(req) {
     const name = data.name;
     const category = data.category || "Other";
     const boxes = data.boxes ?? 1;
-    const piecesPerBox = Math.max(1, Math.floor(+data.pieces_per_box || 1));
+    const piecesPerBox = data.pieces_per_box ?? 1;
     // Prices are optional. Blank = not set (0 for a new item, keep the old price when restocking).
     const optPrice = v => (v === undefined || v === null || v === "" || !(+v >= 0)) ? null : +v;
     const costPrice = optPrice(data.cost_price);
@@ -37,14 +37,14 @@ export async function POST(req) {
     let item;
     if (existing) {
       await query(
-        "UPDATE items SET qty=qty+$1,cost_price=COALESCE($2,cost_price),sale_price=COALESCE($3,sale_price),low_stock_limit=COALESCE($6,low_stock_limit),pieces_per_box=CASE WHEN $7>1 THEN $7 ELSE COALESCE(pieces_per_box,1) END WHERE id=$4 AND shop_id=$5",
-        [totalQty, costPrice, salePrice, existing.id, user.shop_id, lowLimit, piecesPerBox]
+        "UPDATE items SET qty=qty+$1,cost_price=COALESCE($2,cost_price),sale_price=COALESCE($3,sale_price),low_stock_limit=COALESCE($6,low_stock_limit) WHERE id=$4 AND shop_id=$5",
+        [totalQty, costPrice, salePrice, existing.id, user.shop_id, lowLimit]
       );
       item = await row("SELECT * FROM items WHERE id=$1", [existing.id]);
     } else {
       item = await row(
-        "INSERT INTO items (shop_id,name,category,qty,cost_price,sale_price,low_stock_limit,pieces_per_box) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *",
-        [user.shop_id, name, category, totalQty, costPrice ?? 0, salePrice ?? 0, lowLimit ?? 10, piecesPerBox]
+        "INSERT INTO items (shop_id,name,category,qty,cost_price,sale_price,low_stock_limit) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *",
+        [user.shop_id, name, category, totalQty, costPrice ?? 0, salePrice ?? 0, lowLimit ?? 10]
       );
     }
     return NextResponse.json(item);
