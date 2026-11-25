@@ -13,7 +13,7 @@
 
 // Developer credit printed at the bottom of every bill. Put the phone number in DEVELOPER_PHONE.
 export const DEVELOPER_NAME = "Abu Bakar";
-export const DEVELOPER_PHONE = "";
+export const DEVELOPER_PHONE = "03096149644";
 export const developerLine = () => `Software by ${DEVELOPER_NAME}${DEVELOPER_PHONE ? " — " + DEVELOPER_PHONE : ""}`;
 
 export function esc(v) {
